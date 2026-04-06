@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PortfolioOS — Personal Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "surface-lowest": "#0a0e14",
+          "surface-base":   "#10141a",
+          "surface-low":    "#181c22",
+          "surface-card":   "#1c2026",
+          "surface-high":   "#262a31",
+          "border-subtle":  "#21262d",
+          "accent":         "#58a6ff",
+          "gain":           "#3fb950",
+          "loss":           "#f85149",
+          "txt-primary":    "#e6edf3",
+          "txt-muted":      "#8b949e",
+        },
+        fontFamily: {
+          sans: ["Inter", "sans-serif"],
+          mono: ["JetBrains Mono", "monospace"],
+        },
+        borderRadius: { DEFAULT: "0px", full: "9999px" }
+      }
+    }
+  }
+</script>
+
+<style>
+  * { box-sizing: border-box; }
+  body { background:#10141a; color:#e6edf3; font-family:'Inter',sans-serif; overflow:hidden; }
+  .mono { font-family:'JetBrains Mono',monospace !important; }
+  .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; vertical-align:middle; }
+  .filled { font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24; }
+
+  ::-webkit-scrollbar { width:3px; height:3px; }
+  ::-webkit-scrollbar-track { background:#0a0e14; }
+  ::-webkit-scrollbar-thumb { background:#31353c; border-radius:2px; }
+
+  /* Views */
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* Sidebar nav */
+  .nav-btn { border-left:2px solid transparent; transition:all .15s ease; }
+  .nav-btn.active { background:rgba(88,166,255,.08); border-left-color:#58a6ff; color:#58a6ff; }
+  .nav-btn:not(.active):hover { background:rgba(255,255,255,.04); color:#e6edf3; }
+
+  /* Chart tabs */
+  .tab-btn { border-bottom:2px solid transparent; transition:all .15s; padding-bottom:2px; }
+  .tab-btn.active { color:#58a6ff; border-bottom-color:#58a6ff; }
+  .tab-btn:not(.active):hover { color:#e6edf3; }
+
+  /* Heat cells */
+  .heat-cell { transition:opacity .2s; cursor:default; }
+  .heat-cell:hover { opacity:.75; }
+
+  /* Pulse animation */
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.25} }
+  .live-dot { animation:pulse-dot 2s infinite; }
+
+  /* Spin animation */
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .spinning { animation:spin .5s linear; }
+
+  /* Modal */
+  .modal-bg {
+    position:fixed; inset:0; background:rgba(0,0,0,.72);
+    z-index:200; display:none; align-items:center; justify-content:center;
+  }
+  .modal-bg.open { display:flex; }
+
+  /* Spinner */
+  @keyframes spin-loop { to { transform: rotate(360deg); } }
+  .animate-spin { animation: spin-loop .8s linear infinite; }
+
+  /* Dot grid background */
+  .dot-grid {
+    background-image:radial-gradient(#58a6ff 1px, transparent 1px);
+    background-size:24px 24px;
+    opacity:.03;
+  }
+
+  /* SVG path transitions */
+  #portfolio-line, #portfolio-fill, #benchmark-line {
+    transition: d .4s ease;
+  }
+
+  /* Holdings row delete button reveal */
+  .holding-row .del-btn { opacity:0; transition:opacity .15s; }
+  .holding-row:hover .del-btn { opacity:1; }
+
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+</style>
+</head>
+<body>
+
+<!-- ── DOT GRID BG ───────────────────────────────────────── -->
+<div class="fixed inset-0 pointer-events-none z-0 dot-grid"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════ -->
+<aside class="fixed left-0 top-0 bottom-0 w-16 bg-[#0a0e14] flex flex-col items-center py-4 z-50">
+
+  <div class="w-9 h-9 bg-[#58a6ff]/10 flex items-center justify-center mb-4">
+    <span class="text-[#58a6ff] mono font-black text-[10px] tracking-tight">POS</span>
+  </div>
+
+  <nav class="flex flex-col w-full gap-0.5 flex-1">
+    <button class="nav-btn active w-full py-3 flex flex-col items-center gap-0.5"
+            onclick="switchView('portfolio')" id="nav-portfolio">
+      <span class="material-symbols-outlined text-xl">dashboard</span>
+      <span class="text-[8px] uppercase tracking-wider font-semibold">Portfolio</span>
+    </button>
+    <button class="nav-btn w-full py-3 flex flex-col items-center gap-0.5 text-[#8b949e]"
+            onclick="switchView('markets')" id="nav-markets">
+      <span class="material-symbols-outlined text-xl">public</span>
+      <span class="text-[8px] uppercase tracking-wider font-semibold">Markets</span>
+    </button>
+    <button class="nav-btn w-full py-3 flex flex-col items-center gap-0.5 text-[#8b949e]"
+            onclick="switchView('macro')" id="nav-macro">
+      <span class="material-symbols-outlined text-xl">monitoring</span>
+      <span class="text-[8px] uppercase tracking-wider font-semibold">Macro</span>
+    </button>
+    <button class="nav-btn w-full py-3 flex flex-col items-center gap-0.5 text-[#8b949e]"
+            onclick="switchView('watchlist')" id="nav-watchlist">
+      <span class="material-symbols-outlined text-xl">visibility</span>
+      <span class="text-[8px] uppercase tracking-wider font-semibold">Watch</span>
+    </button>
+  </nav>
+
+  <div class="flex flex-col items-center gap-3">
+    <button class="text-[#8b949e] hover:text-[#e6edf3] transition-colors">
+      <span class="material-symbols-outlined text-xl">settings</span>
+    </button>
+    <div class="w-8 h-8 bg-[#21262d] flex items-center justify-center">
+      <span class="text-[10px] font-bold text-[#8b949e]">XH</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════
+     TOP BAR
+════════════════════════════════════════════════════════ -->
+<header class="fixed top-0 right-0 left-16 h-12 bg-[#10141a] border-b border-[#21262d]
+               flex items-center justify-between px-6 z-40">
+  <span class="text-[11px] mono text-[#8b949e]" id="header-bc">Terminal / Portfolio Overview</span>
+  <div class="flex items-center gap-5">
+    <div class="flex items-center gap-1.5">
+      <div class="w-1.5 h-1.5 rounded-full bg-[#8b949e]" id="server-dot" title="Server status"></div>
+      <span class="text-[9px] mono text-[#8b949e] uppercase tracking-widest" id="server-lbl">Offline</span>
+    </div>
+    <span class="text-[10px] mono text-[#8b949e]" id="audusd-rate" title="AUD/USD rate"></span>
+    <span class="text-[10px] mono text-[#8b949e]" id="clock">--:-- --</span>
+    <button onclick="refreshData()" class="text-[#8b949e] hover:text-[#e6edf3] transition-colors" id="refresh-btn">
+      <span class="material-symbols-outlined text-lg" id="refresh-icon">refresh</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════════════════════ -->
+<main class="ml-16 mt-12 h-[calc(100vh-48px)] overflow-y-auto relative z-10">
+
+<!-- ─────────────────────────────────────────────────────
+     VIEW: PORTFOLIO
+───────────────────────────────────────────────────────── -->
+<div class="view active p-5 space-y-4" id="view-portfolio">
+
+  <!-- SUMMARY STRIP -->
+  <section class="grid grid-cols-4 border border-[#21262d]">
+    <div class="bg-[#161b22] border-r border-[#21262d] p-4 h-20 flex flex-col justify-between">
+      <span class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Total Value (A$)</span>
+      <span class="text-2xl mono font-bold" id="s-total-value">—</span>
+    </div>
+    <div class="bg-[#161b22] border-r border-[#21262d] p-4 h-20 flex flex-col justify-between">
+      <span class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Today's P&amp;L (A$)</span>
+      <div class="flex items-baseline gap-2">
+        <span class="text-2xl mono font-bold" id="s-day-pnl">—</span>
+        <span class="text-xs mono font-medium" id="s-day-pct">—</span>
+      </div>
+    </div>
+    <div class="bg-[#161b22] border-r border-[#21262d] p-4 h-20 flex flex-col justify-between">
+      <span class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Total Return</span>
+      <div class="flex items-baseline gap-2">
+        <span class="text-2xl mono font-bold" id="s-total-ret">—</span>
+        <span class="text-xs mono font-medium" id="s-total-ret-pct">—</span>
+      </div>
+    </div>
+    <div class="bg-[#161b22] p-4 h-20 flex flex-col justify-between">
+      <span class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Invested</span>
+      <span class="text-2xl mono font-bold text-[#8b949e]">A$20,939</span>
+    </div>
+  </section>
+
+  <!-- TWO COLUMNS -->
+  <div class="grid gap-4" style="grid-template-columns:65% calc(35% - 1rem)">
+
+    <!-- LEFT -->
+    <div class="space-y-4">
+
+      <!-- HOLDINGS TABLE -->
+      <div class="bg-[#0d1117] border border-[#21262d]">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-[#21262d]">
+          <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Holdings</h2>
+          <button onclick="openModal()" class="text-[10px] font-bold text-[#58a6ff] hover:text-[#79b8ff] transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">add</span>ADD POSITION
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-[#161b22]">
+              <tr class="text-[10px] text-[#8b949e] font-bold uppercase tracking-wider h-9">
+                <th class="px-4">Ticker</th>
+                <th class="px-3">Name</th>
+                <th class="px-3 text-right">Shares</th>
+                <th class="px-3 text-right">Avg Cost</th>
+                <th class="px-3 text-right">Price</th>
+                <th class="px-3 text-right">Mkt Value</th>
+                <th class="px-3 text-right">Day %</th>
+                <th class="px-3 text-right">Return</th>
+                <th class="px-2 w-6"></th>
+              </tr>
+            </thead>
+            <tbody id="holdings-body" class="text-[12px] mono"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PERFORMANCE CHART -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Performance</h2>
+          <div class="flex gap-3 text-[10px] font-bold uppercase tracking-wider text-[#8b949e]">
+            <button class="tab-btn" onclick="setPeriod('1W')">1W</button>
+            <button class="tab-btn active" onclick="setPeriod('1M')">1M</button>
+            <button class="tab-btn" onclick="setPeriod('3M')">3M</button>
+            <button class="tab-btn" onclick="setPeriod('YTD')">YTD</button>
+            <button class="tab-btn" onclick="setPeriod('1Y')">1Y</button>
+            <button class="tab-btn" onclick="setPeriod('ALL')">ALL</button>
+          </div>
+        </div>
+        <div class="relative" style="height:180px; margin-bottom:24px">
+          <!-- Chart tooltip -->
+          <div id="chart-tooltip" class="absolute pointer-events-none z-20 hidden"
+               style="transform:translateX(-50%)">
+            <div class="bg-[#262a31] border border-[#58a6ff]/30 px-2 py-1 text-[10px] mono whitespace-nowrap">
+              <span id="tt-label" class="text-[#8b949e]"></span>
+              <span id="tt-port"  class="text-[#58a6ff] font-bold ml-2"></span>
+            </div>
+          </div>
+          <svg id="perf-svg" width="100%" height="180" preserveAspectRatio="none" style="overflow:visible;cursor:crosshair"
+               onmousemove="chartMouseMove(event)" onmouseleave="chartMouseLeave()">
+            <defs>
+              <linearGradient id="portGrad" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Grid -->
+            <line x1="0" y1="0"   x2="100%" y2="0"   stroke="#21262d" stroke-width="1" opacity=".5"/>
+            <line x1="0" y1="45"  x2="100%" y2="45"  stroke="#21262d" stroke-width="1" opacity=".5"/>
+            <line x1="0" y1="90"  x2="100%" y2="90"  stroke="#21262d" stroke-width="1" opacity=".5"/>
+            <line x1="0" y1="135" x2="100%" y2="135" stroke="#21262d" stroke-width="1" opacity=".5"/>
+            <line x1="0" y1="180" x2="100%" y2="180" stroke="#21262d" stroke-width="1"/>
+            <!-- Paths -->
+            <path id="port-fill" fill="url(#portGrad)"/>
+            <path id="port-line" fill="none" stroke="#58a6ff" stroke-width="2"/>
+            <path id="bench-line" fill="none" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <!-- Tooltip crosshair -->
+            <line id="chart-crosshair" x1="0" y1="0" x2="0" y2="180"
+                  stroke="#58a6ff" stroke-width="1" stroke-dasharray="3,2" opacity=".5" style="display:none"/>
+            <circle id="chart-dot" r="4" fill="#58a6ff" stroke="#10141a" stroke-width="2" style="display:none"/>
+          </svg>
+          <div id="x-labels" class="absolute -bottom-5 left-0 right-0 flex justify-between text-[9px] mono text-[#8b949e]"></div>
+        </div>
+        <div class="flex items-center gap-5 mt-2">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 bg-[#58a6ff]"></div>
+            <span class="text-[10px] text-[#8b949e]">Portfolio <span id="port-lbl" class="text-[#3fb950] font-bold">+18.4%</span></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-4 border-t border-dashed border-[#8b949e]"></div>
+            <span class="text-[10px] text-[#8b949e]">S&amp;P 500 <span id="sp-lbl" class="font-bold text-[#8b949e]">+9.1%</span></span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /LEFT -->
+
+    <!-- RIGHT -->
+    <div class="space-y-4">
+
+      <!-- ALLOCATION DONUT -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-3">Allocation</h2>
+        <div class="flex items-center gap-4">
+          <div class="relative flex-shrink-0" style="width:96px;height:96px">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <g id="donut-g" transform="rotate(-90 48 48)"></g>
+              <text x="48" y="45" text-anchor="middle" fill="#e6edf3"
+                    font-size="15" font-weight="700" font-family="JetBrains Mono" id="donut-count">5</text>
+              <text x="48" y="56" text-anchor="middle" fill="#8b949e"
+                    font-size="7" font-family="Inter">assets</text>
+            </svg>
+          </div>
+          <div class="flex flex-col gap-2 flex-1" id="alloc-legend"></div>
+        </div>
+      </div>
+
+      <!-- TODAY'S MOVERS -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-3">Today's Movers</h2>
+        <div class="text-[9px] font-bold text-[#3fb950] uppercase tracking-widest mb-1.5 flex items-center gap-1">
+          <span class="material-symbols-outlined text-xs">arrow_upward</span>Winners
+        </div>
+        <div id="winners-list" class="space-y-1 mb-3"></div>
+        <div class="text-[9px] font-bold text-[#f85149] uppercase tracking-widest mb-1.5 flex items-center gap-1">
+          <span class="material-symbols-outlined text-xs">arrow_downward</span>Losers
+        </div>
+        <div id="losers-list" class="space-y-1"></div>
+      </div>
+
+      <!-- PORTFOLIO HEALTH -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-2">Portfolio Health</h2>
+        <div class="flex items-baseline gap-1 mb-1">
+          <span class="text-5xl mono font-bold text-[#58a6ff]" id="health-score">74</span>
+          <span class="text-lg mono text-[#8b949e]">/100</span>
+        </div>
+        <div class="flex items-center gap-1 mb-3">
+          <span class="material-symbols-outlined text-sm text-[#3fb950] filled">check_circle</span>
+          <span class="text-[10px] font-bold text-[#3fb950] uppercase" id="health-label">Well Diversified</span>
+        </div>
+        <div class="h-1.5 bg-[#21262d]">
+          <div class="h-full bg-gradient-to-r from-[#58a6ff] to-[#79b8ff]" id="health-bar" style="width:74%"></div>
+        </div>
+      </div>
+
+    </div><!-- /RIGHT -->
+  </div>
+</div><!-- /PORTFOLIO VIEW -->
+
+
+<!-- ─────────────────────────────────────────────────────
+     VIEW: MARKETS
+───────────────────────────────────────────────────────── -->
+<div class="view p-5 space-y-4" id="view-markets">
+
+  <!-- INDEX STRIP -->
+  <section class="grid grid-cols-6 gap-2" id="index-strip"></section>
+
+  <!-- TWO COLUMN -->
+  <div class="grid gap-4" style="grid-template-columns:58% calc(42% - 1rem)">
+
+    <!-- LEFT -->
+    <div class="space-y-4">
+
+      <!-- HEATMAP -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4">Global Asset Class Heatmap</h2>
+        <table class="w-full text-[11px] mono border-collapse">
+          <thead>
+            <tr class="text-[10px] text-[#8b949e] uppercase tracking-wider">
+              <th class="pb-3 text-left font-medium pr-4">Asset Class</th>
+              <th class="pb-3 text-center font-medium w-14">1D</th>
+              <th class="pb-3 text-center font-medium w-14">1W</th>
+              <th class="pb-3 text-center font-medium w-14">1M</th>
+              <th class="pb-3 text-center font-medium w-14">YTD</th>
+            </tr>
+          </thead>
+          <tbody id="heatmap-body"></tbody>
+        </table>
+      </div>
+
+      <!-- MOVERS -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-[#0d1117] border border-[#21262d] border-l-2 border-l-[#3fb950]/40 p-4">
+          <h3 class="text-[10px] font-bold tracking-widest text-[#3fb950] uppercase mb-3 flex items-center gap-1">
+            <span class="material-symbols-outlined text-xs">trending_up</span>Top Gainers
+          </h3>
+          <div id="mkt-gainers" class="space-y-2.5"></div>
+        </div>
+        <div class="bg-[#0d1117] border border-[#21262d] border-l-2 border-l-[#f85149]/40 p-4">
+          <h3 class="text-[10px] font-bold tracking-widest text-[#f85149] uppercase mb-3 flex items-center gap-1">
+            <span class="material-symbols-outlined text-xs">trending_down</span>Top Losers
+          </h3>
+          <div id="mkt-losers" class="space-y-2.5"></div>
+        </div>
+      </div>
+
+    </div><!-- /LEFT -->
+
+    <!-- RIGHT -->
+    <div class="space-y-4">
+
+      <!-- SECTORS -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4">S&amp;P 500 Sectors — YTD</h2>
+        <div id="sector-bars" class="space-y-3"></div>
+      </div>
+
+      <!-- FX -->
+      <div class="bg-[#0d1117] border border-[#21262d] p-4">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-3">FX Snapshot</h2>
+        <div id="fx-rows" class="divide-y divide-[#21262d]"></div>
+        <div class="mt-3 pt-3 border-t border-[#21262d] flex items-center justify-between">
+          <span class="text-[9px] mono text-[#8b949e]">DATA_SOURCE: YAHOO_FINANCE</span>
+          <div class="flex items-center gap-1">
+            <div class="w-1.5 h-1.5 rounded-full bg-[#3fb950] live-dot"></div>
+            <span class="text-[9px] mono text-[#8b949e]">LIVE</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /RIGHT -->
+  </div>
+</div><!-- /MARKETS VIEW -->
+
+
+<!-- ─────────────────────────────────────────────────────
+     VIEW: MACRO
+───────────────────────────────────────────────────────── -->
+<div class="view p-5" id="view-macro">
+  <div class="grid grid-cols-3 gap-4">
+
+    <!-- LEFT: Pulse -->
+    <div class="space-y-4">
+
+      <div class="bg-[#1c2026] p-5">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4 flex items-center gap-2">
+          <span class="w-1 h-3 bg-[#58a6ff] inline-block"></span>Key Indicators
+        </h2>
+        <div id="indicators-list"></div>
+      </div>
+
+      <div class="bg-[#1c2026] p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Yield Curve</h2>
+          <span class="text-[9px] text-[#f85149] mono font-bold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 bg-[#f85149] rounded-full"></span>Inverted
+          </span>
+        </div>
+        <div class="relative" style="height:110px; margin-bottom:18px">
+          <svg width="100%" height="110" style="overflow:visible">
+            <line x1="0" y1="0"   x2="100%" y2="0"   stroke="#21262d" stroke-width="1"/>
+            <line x1="0" y1="28"  x2="100%" y2="28"  stroke="#21262d" stroke-width="1"/>
+            <line x1="0" y1="55"  x2="100%" y2="55"  stroke="#21262d" stroke-width="1"/>
+            <line x1="0" y1="82"  x2="100%" y2="82"  stroke="#21262d" stroke-width="1"/>
+            <line x1="0" y1="110" x2="100%" y2="110" stroke="#21262d" stroke-width="1"/>
+            <!-- inverted zone -->
+            <rect x="0" y="55" width="40%" height="55" fill="#f85149" opacity=".04"/>
+            <!-- curve: rises steeply short end, flattens/inverts at 2Y, normalises at 10Y+ -->
+            <path d="M 2,100 C 20,85 35,65 50,60 S 80,58 110,52 S 150,38 200,25 S 240,18 98%,14"
+                  fill="none" stroke="#58a6ff" stroke-width="2"/>
+            <text x="3" y="108" fill="#f85149" font-size="7" font-family="Inter" opacity=".7">2Y&gt;10Y zone</text>
+          </svg>
+          <div class="absolute -bottom-4 left-0 right-0 flex justify-between text-[8px] mono text-[#8b949e]">
+            <span>3M</span><span>2Y</span><span>5Y</span><span>10Y</span><span>30Y</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[#1c2026] p-5">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4">Central Bank Watch</h2>
+        <div id="cb-list" class="space-y-2"></div>
+      </div>
+
+    </div><!-- /LEFT -->
+
+    <!-- CENTER: AI Briefing -->
+    <div>
+      <div class="bg-[#1c2026] p-6 relative overflow-hidden flex flex-col" style="min-height:100%">
+        <div class="absolute top-0 right-0 w-24 h-24 bg-[#58a6ff]/5 -translate-y-12 translate-x-12 rotate-45 pointer-events-none"></div>
+        <div class="flex items-start justify-between mb-1">
+          <div>
+            <div class="text-[#58a6ff] text-xs font-extrabold uppercase tracking-[.2em]">What's Driving Markets</div>
+            <div class="text-[10px] text-[#8b949e] mono mt-0.5" id="macro-edition">—</div>
+          </div>
+          <button onclick="generateBriefing()" id="gen-btn"
+            class="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1
+                   bg-[#58a6ff]/10 hover:bg-[#58a6ff]/20 text-[#58a6ff] px-3 py-1.5 transition-colors shrink-0">
+            <span class="material-symbols-outlined text-xs" id="gen-icon">auto_awesome</span>
+            <span id="gen-label">Generate</span>
+          </button>
+        </div>
+        <div id="macro-headline" class="text-[13px] font-bold text-[#e6edf3] leading-snug mb-4 mt-2 hidden"></div>
+        <div class="border-t border-[#58a6ff]/20 mb-5"></div>
+
+        <!-- Loading state -->
+        <div id="briefing-loading" class="hidden flex-1 flex flex-col items-center justify-center gap-3 py-10">
+          <div class="w-6 h-6 border-2 border-[#58a6ff] border-t-transparent rounded-full animate-spin"></div>
+          <span class="text-[10px] text-[#8b949e] mono">Fetching live data + generating briefing…</span>
+        </div>
+
+        <!-- Error state -->
+        <div id="briefing-error" class="hidden text-[11px] text-[#f85149] mono p-3 bg-[#f85149]/5 border border-[#f85149]/20"></div>
+
+        <!-- Briefing content -->
+        <div id="briefing" class="space-y-5 flex-1">
+          <!-- Static placeholder shown before first generation -->
+          <div class="text-[11px] text-[#8b949e] leading-relaxed">
+            Click <span class="text-[#58a6ff] font-bold">Generate</span> to fetch live market data and get an AI-powered macro briefing tailored to your portfolio. Requires the proxy server running with <span class="mono text-[#8b949e]">ANTHROPIC_API_KEY</span> set.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Geo + Calendar -->
+    <div class="space-y-4">
+
+      <div class="bg-[#1c2026] p-5">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4">Geography Scorecard</h2>
+        <div id="geo-list" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-[#1c2026] p-5">
+        <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase mb-4">Economic Calendar</h2>
+        <table class="w-full text-[10px]">
+          <thead>
+            <tr class="border-b border-[#21262d] text-[#8b949e] text-left">
+              <th class="pb-2 font-bold uppercase tracking-tight">Event</th>
+              <th class="pb-2 w-6 text-center font-bold uppercase tracking-tight">!</th>
+              <th class="pb-2 text-right font-bold uppercase tracking-tight">Est.</th>
+            </tr>
+          </thead>
+          <tbody id="calendar-body" class="mono"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /MACRO VIEW -->
+
+
+<!-- ─────────────────────────────────────────────────────
+     VIEW: WATCHLIST
+───────────────────────────────────────────────────────── -->
+<div class="view p-5 space-y-4" id="view-watchlist">
+
+  <!-- Header row -->
+  <div class="flex items-center justify-between">
+    <h2 class="text-[10px] font-bold tracking-widest text-[#8b949e] uppercase">Watchlist</h2>
+    <div class="flex items-center gap-2">
+      <input id="wl-input" type="text" placeholder="Add Yahoo Finance symbol (e.g. NVDA, ^FTSE)"
+        class="bg-[#161b22] border border-[#21262d] text-[#e6edf3] mono text-xs px-3 py-1.5 w-72
+               focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e] uppercase placeholder:normal-case"
+        onkeydown="if(event.key==='Enter')addWatchlistItem()"/>
+      <button onclick="addWatchlistItem()"
+        class="text-[10px] font-bold text-[#58a6ff] hover:text-[#79b8ff] border border-[#58a6ff]/30
+               hover:border-[#58a6ff] px-3 py-1.5 transition-colors flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">add</span>ADD
+      </button>
+      <button onclick="refreshWatchlist()"
+        class="text-[10px] font-bold text-[#8b949e] hover:text-[#e6edf3] border border-[#21262d]
+               hover:border-[#8b949e] px-3 py-1.5 transition-colors flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm" id="wl-refresh-icon">refresh</span>REFRESH
+      </button>
+    </div>
+  </div>
+
+  <!-- Watchlist table -->
+  <div class="bg-[#0d1117] border border-[#21262d]">
+    <table class="w-full text-left">
+      <thead class="bg-[#161b22]">
+        <tr class="text-[10px] text-[#8b949e] font-bold uppercase tracking-wider h-9">
+          <th class="px-4">Symbol</th>
+          <th class="px-3">Name</th>
+          <th class="px-3 text-right">Price</th>
+          <th class="px-3 text-right">Day %</th>
+          <th class="px-3 text-right">Trend</th>
+          <th class="px-2 w-6"></th>
+        </tr>
+      </thead>
+      <tbody id="watchlist-body" class="text-[12px] mono"></tbody>
+    </table>
+    <div id="watchlist-empty" class="hidden p-8 text-center text-[#8b949e] text-xs">
+      No items — add a Yahoo Finance symbol above
+    </div>
+  </div>
+
+  <!-- Macro quick-stats bar (reuses /api/macro indicators) -->
+  <div class="grid grid-cols-6 gap-3" id="wl-macro-bar">
+    <!-- Populated by refreshWatchlist when macro data available -->
+  </div>
+
+</div>
+
+</main><!-- /MAIN -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     ADD POSITION MODAL
+════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="add-modal" onclick="if(event.target===this)closeModal()">
+  <div class="bg-[#161b22] border border-[#21262d] w-[400px] p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="text-sm font-bold text-[#e6edf3] uppercase tracking-widest">Add Position</h3>
+      <button onclick="closeModal()" class="text-[#8b949e] hover:text-white transition-colors">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Ticker Symbol</label>
+        <input id="f-ticker" type="text" placeholder="e.g. AAPL"
+          class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] mono text-sm px-3 py-2
+                 focus:outline-none focus:border-[#58a6ff] uppercase placeholder:normal-case placeholder:text-[#8b949e]"/>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Company Name</label>
+        <input id="f-name" type="text" placeholder="e.g. Apple Inc"
+          class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] text-sm px-3 py-2
+                 focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e]"/>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Shares</label>
+          <input id="f-shares" type="number" placeholder="0" min="0"
+            class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] mono text-sm px-3 py-2
+                   focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e]"/>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Avg Cost ($)</label>
+          <input id="f-cost" type="number" placeholder="0.00" step="0.01"
+            class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] mono text-sm px-3 py-2
+                   focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e]"/>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Current Price ($)</label>
+        <input id="f-price" type="number" placeholder="0.00" step="0.01"
+          class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] mono text-sm px-3 py-2
+                 focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e]"/>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Day Change (%)</label>
+        <input id="f-day" type="number" placeholder="0.00" step="0.01"
+          class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] mono text-sm px-3 py-2
+                 focus:outline-none focus:border-[#58a6ff] placeholder:text-[#8b949e]"/>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-[#8b949e] uppercase tracking-widest block mb-1">Category</label>
+        <select id="f-cat" class="w-full bg-[#0d1117] border border-[#21262d] text-[#e6edf3] text-sm px-3 py-2 focus:outline-none focus:border-[#58a6ff]">
+          <option>US Stocks</option>
+          <option>International</option>
+          <option>ETFs</option>
+          <option>Crypto</option>
+          <option>Bonds</option>
+          <option>Commodities</option>
+        </select>
+      </div>
+      <button onclick="addPosition()"
+        class="w-full bg-[#58a6ff] text-[#0d1117] font-bold text-sm py-2.5 mt-2
+               hover:bg-[#79b8ff] transition-colors uppercase tracking-widest">
+        Add Position
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────
+
+// Real portfolio data — sourced from portfolio-tracker project (AUD-denominated)
+// day values = percentage change (e.g. 0.206 = +0.206%)
+let holdings = [
+  { ticker:'AMZN', name:'Amazon.com',   shares:16,         avgCost:292.7125, price:302.96,  day: 0.00,   cat:'US Stocks', yf:'AMZN',         currency:'USD' },
+  { ticker:'SOL',  name:'Solana',       shares:30.291018,  avgCost:208.1178, price:117.008, day: 0.368,  cat:'Crypto',    yf:'SOL-AUD'       },
+  { ticker:'ETH',  name:'Ethereum',     shares:1.090046,   avgCost:3706.319, price:2987.34, day: 0.296,  cat:'Crypto',    yf:'ETH-AUD'       },
+  { ticker:'DOGE', name:'Dogecoin',     shares:7591.1905,  avgCost:0.18882,  price:0.13305, day: 0.206,  cat:'Crypto',    yf:'DOGE-AUD'      },
+  { ticker:'SUI',  name:'Sui',          shares:335.78540,  avgCost:4.98230,  price:1.2619,  day:-0.172,  cat:'Crypto',    yf:'SUI20947-USD', currency:'USD' },
+];
+
+const INDICES = [
+  { name:'S&P 500',  val:'5,218.40',  chg: 0.64  },
+  { name:'NASDAQ',   val:'16,340.20', chg: 1.02  },
+  { name:'DOW',      val:'38,904.00', chg:-0.11  },
+  { name:'FTSE 100', val:'7,820.10',  chg: 0.28  },
+  { name:'NIKKEI',   val:'38,200.50', chg:-0.44  },
+  { name:'BTC/USD',  val:'$67,400',   chg: 3.21  },
+];
+
+const HEATMAP = [
+  { name:'US Equities', d: 0.64, w: 1.2,  m: 3.4,  ytd:  9.1 },
+  { name:'EU Equities', d: 0.28, w:-0.4,  m: 1.8,  ytd:  4.2 },
+  { name:'EM Equities', d:-0.32, w:-1.1,  m:-0.8,  ytd: -2.4 },
+  { name:'US Bonds',    d:-0.12, w:-0.6,  m:-1.2,  ytd: -3.8 },
+  { name:'Gold',        d: 0.44, w: 2.1,  m: 5.6,  ytd: 12.3 },
+  { name:'Oil (WTI)',   d:-1.20, w:-3.4,  m:-2.1,  ytd: -8.4 },
+  { name:'Bitcoin',     d: 3.21, w: 8.4,  m:14.2,  ytd: 42.1 },
+  { name:'USD (DXY)',   d:-0.18, w:-0.8,  m:-1.4,  ytd: -4.2 },
+];
+
+const SECTORS = [
+  { n:'Technology',     v: 18.4 },
+  { n:'Comm Services',  v: 12.1 },
+  { n:'Consumer Disc',  v:  8.3 },
+  { n:'Industrials',    v:  6.7 },
+  { n:'Financials',     v:  5.9 },
+  { n:'Healthcare',     v:  1.2 },
+  { n:'Materials',      v: -0.4 },
+  { n:'Real Estate',    v: -2.1 },
+  { n:'Utilities',      v: -3.3 },
+  { n:'Cons Staples',   v: -4.1 },
+  { n:'Energy',         v: -8.2 },
+];
+
+const GAINERS = [
+  { t:'NVDA', n:'NVIDIA',    chg: 4.52 },
+  { t:'PLTR', n:'Palantir',  chg: 3.81 },
+  { t:'COIN', n:'Coinbase',  chg: 3.22 },
+  { t:'MSTR', n:'MicroStr.', chg: 2.98 },
+  { t:'AMD',  n:'AMD',       chg: 2.15 },
+];
+
+const LOSERS = [
+  { t:'INTC', n:'Intel',   chg:-3.40 },
+  { t:'BA',   n:'Boeing',  chg:-2.88 },
+  { t:'PFE',  n:'Pfizer',  chg:-1.95 },
+  { t:'XOM',  n:'ExxonM.', chg:-1.42 },
+  { t:'CVS',  n:'CVS',     chg:-1.21 },
+];
+
+const FX = [
+  { p:'EUR/USD', r:'1.0842', d: 0.18, m: 1.2  },
+  { p:'GBP/USD', r:'1.2634', d:-0.08, m: 0.8  },
+  { p:'USD/JPY', r:'151.24', d:-0.32, m:-2.1  },
+  { p:'DXY',     r:'103.84', d:-0.18, m:-1.4  },
+];
+
+const INDICATORS = [
+  { n:'Fed Funds Rate', v:'5.25–5.50%', b:'On Hold',  bc:'bg-yellow-500/10 text-yellow-400'   },
+  { n:'US CPI YoY',     v:'3.2%',       b:'Elevated', bc:'bg-orange-500/10 text-orange-400'   },
+  { n:'US 10Y Yield',   v:'4.31%',      b:'High',     bc:'bg-red-500/10 text-red-400'          },
+  { n:'US 2Y Yield',    v:'4.68%',      b:'High',     bc:'bg-red-500/10 text-red-400'          },
+  { n:'DXY Dollar',     v:'103.84',     b:'Neutral',  bc:'bg-[#8b949e]/10 text-[#8b949e]'     },
+  { n:'VIX',            v:'18.4',       b:'Calm',     bc:'bg-green-500/10 text-green-400'      },
+];
+
+const CB = [
+  { bank:'FED', rate:'5.25%', meet:'May 7',  act:'HOLD',     ac:'text-[#8b949e]'  },
+  { bank:'ECB', rate:'4.00%', meet:'Apr 17', act:'CUT -25bp',ac:'text-[#3fb950]'  },
+  { bank:'BOJ', rate:'0.10%', meet:'Apr 30', act:'HIKE',     ac:'text-[#f0883e]'  },
+];
+
+const BRIEFING = [
+  { icon:'account_balance', label:'FED WATCH', col:'#58a6ff',
+    text:"Markets are pricing in two rate cuts in 2026 after Friday's non-farm payrolls came in softer than expected at 142k vs 185k forecast. The Fed remains data-dependent but the window for a June cut is narrowing. Watch Tuesday's CPI — anything above 3.4% pushes expectations to September." },
+  { icon:'public', label:'GLOBAL PICTURE', col:'#58a6ff',
+    text:"China's PMI surprised to the upside at 51.4, lifting EM sentiment broadly. Europe is outperforming YTD as ECB cuts boost consumer confidence. Japan remains a wildcard — BOJ's pivot from ultra-loose policy is strengthening the Yen, pressuring Japanese exporters." },
+  { icon:'monitoring', label:'SECTOR ROTATION', col:'#58a6ff',
+    text:"Money is rotating out of defensives (Utilities, Staples) into cyclicals as recession fears fade. Tech continues to lead on AI capex spend. NVDA earnings next week will be a key sentiment test. Energy is lagging as oil demand forecasts are revised down on China slowdown fears." },
+  { icon:'warning', label:'KEY RISK THIS WEEK', col:'#f85149',
+    text:"Tuesday CPI, Wednesday FOMC minutes, Friday retail sales. Any CPI surprise above 3.5% would reprice rate expectations sharply and sell off bonds and growth stocks. Geopolitical risk in the Middle East keeping oil volatility elevated. Watch 5,100 on S&P as key support." },
+];
+
+const GEO = [
+  { flag:'🇺🇸', n:'United States', idx:'S&P +9.1% YTD',    snt:'Bullish', sc:'text-[#3fb950]', note:'AI-driven growth, labor market resilient'    },
+  { flag:'🇪🇺', n:'Europe',        idx:'STOXX +4.2% YTD',  snt:'Neutral', sc:'text-[#8b949e]', note:'ECB cutting, growth still sluggish'          },
+  { flag:'🇨🇳', n:'China',         idx:'CSI -2.4% YTD',    snt:'Bearish', sc:'text-[#f85149]', note:'Property stress, deflation risk ongoing'     },
+  { flag:'🇯🇵', n:'Japan',         idx:'Nikkei -0.4% YTD', snt:'Neutral', sc:'text-[#8b949e]', note:'BOJ policy shift creating yen volatility'    },
+  { flag:'🌏', n:'Emerging Mkts', idx:'MSCI EM -2.1% YTD', snt:'Bearish', sc:'text-[#f85149]', note:'USD strength & China headwinds persist'      },
+];
+
+const CALENDAR = [
+  { ev:'US ISM Services', imp:'medium', est:'52.8' },
+  { ev:'US CPI YoY',      imp:'high',   est:'3.3%' },
+  { ev:'FOMC Minutes',    imp:'high',   est:'—'    },
+  { ev:'ECB Meeting',     imp:'high',   est:'3.75%'},
+  { ev:'US Retail Sales', imp:'medium', est:'+0.4%'},
+];
+
+// Real equity curve — 119 weekly NAV points, normalized to 100 at period start
+// Source: portfolio-tracker/public/data/portfolio.json
+const CHART_DATA = {
+  '1W':  { port:[100.0,101.53,101.71], bench:[100.0,97.22,96.3], labels:['Mar 27','Apr 3','Apr 5'], pp:'+1.7%', sp:'-3.7%' },
+  '1M':  { port:[100.0,102.33,102.39,98.99,100.51,100.69], bench:[100.0,100.95,101.9,102.86,100.0,99.05], labels:['Mar 6','Mar 13','Mar 20','Mar 27','Apr 5'], pp:'+0.7%', sp:'-1.0%' },
+  '3M':  { port:[100.0,100.92,106.69,91.74,70.88,54.02,80.63,81.86,79.7,82.16,84.07,84.12,81.33,82.58,82.73], bench:[100.0,98.21,96.43,97.32,96.43,95.54,94.64,95.54,94.64,93.75,94.64,95.54,96.43,93.75,92.86], labels:['Jan','Feb','Mar','Apr'], pp:'-17.3%', sp:'-7.1%' },
+  'YTD': { port:[100.0,100.92,106.69,91.74,70.88,54.02,80.63,81.86,79.7,82.16,84.07,84.12,81.33,82.58,82.73], bench:[100.0,98.21,96.43,97.32,96.43,95.54,94.64,95.54,94.64,93.75,94.64,95.54,96.43,93.75,92.86], labels:['Jan','Feb','Mar','Apr'], pp:'-17.3%', sp:'-7.1%' },
+  '1Y':  { port:[100.0,104.5,124.33,123.16,147.51,149.06,150.02,140.27,133.1,135.15,179.72,179.49,188.52,215.45,248.06,256.76,232.85,257.82,274.37,296.15,284.49,296.48,337.58,329.98,292.13,325.86,269.8,266.32,278.74,275.08,238.83,207.87,189.79,202.66,195.4,195.66,171.44,163.71,178.36,180.0,190.29,163.62,126.41,96.35,143.8,146.0,142.15,146.54,149.94,150.04,145.06,147.28,147.55], bench:[100.0,101.69,102.54,104.24,103.39,105.08,105.93,104.24,105.08,106.78,107.63,108.47,110.17,111.86,112.71,111.86,112.71,113.56,114.41,113.56,112.71,113.56,112.71,111.02,109.32,108.47,106.78,105.93,105.08,104.24,103.39,102.54,101.69,100.85,100.0,99.15,98.31,97.46,94.92,93.22,91.53,92.37,91.53,90.68,89.83,90.68,89.83,88.98,89.83,90.68,91.53,88.98,88.14], labels:["Apr'25","Jun'25","Sep'25","Jan'26","Apr'26"], pp:'+47.5%', sp:'-11.9%' },
+  'ALL': { port:[100.0,420.47,422.98,394.21,411.08,441.5,486.85,489.94,590.6,656.14,1020.39,945.05,1016.49,933.82,883.02,836.6,823.3,822.39,898.48,977.13,1221.29,1213.73,1201.89,1099.48,1203.83,1193.34,1088.4,2385.69,2842.06,3000.49,2582.97,2613.69,2630.66,3167.63,2880.93,3512.1,3884.18,4008.34,4266.83,3899.7,3994.95,4350.31,4477.31,5436.64,6487.71,8731.08,9807.8,10704.68,11210.33,10802.69,9464.72,9093.36,10825.46,9689.82,10872.2,11077.25,10594.09,8934.97,9271.63,8237.75,7268.02,6785.8,6263.76,6485.83,6482.35,6414.3,5825.26,6087.29,7242.44,7174.47,8592.73,8682.9,8739.07,8171.31,7753.69,7872.69,10468.94,10455.85,10981.63,12550.29,14449.92,14957.1,13564.01,15018.45,15982.94,17251.22,16572.12,17270.62,19665.05,19222.33,17017.4,18982.14,15716.5,15513.77,16237.5,16023.96,13912.33,12108.9,11055.81,11805.73,11382.75,11397.64,9986.56,9536.48,10389.68,10485.51,11084.65,9531.26,7363.94,5612.88,8376.73,8505.06,8280.54,8536.08,8734.59,8739.93,8450.27,8579.37,8595.11], bench:[100.0,102.0,103.0,101.0,104.0,106.0,107.0,108.0,110.0,111.0,112.0,111.0,113.0,112.0,110.0,108.0,109.0,110.0,111.0,112.0,114.0,113.0,115.0,113.0,114.0,113.0,112.0,115.0,118.0,120.0,117.0,118.0,119.0,120.0,118.0,121.0,123.0,124.0,125.0,124.0,126.0,127.0,128.0,129.0,130.0,132.0,134.0,133.0,135.0,134.0,131.0,132.0,130.0,129.0,128.0,127.0,126.0,128.0,127.0,124.0,123.0,120.0,118.0,120.0,121.0,120.0,118.0,120.0,121.0,123.0,122.0,124.0,125.0,123.0,124.0,126.0,127.0,128.0,130.0,132.0,133.0,132.0,133.0,134.0,135.0,134.0,133.0,134.0,133.0,131.0,129.0,128.0,126.0,125.0,124.0,123.0,122.0,121.0,120.0,119.0,118.0,117.0,116.0,115.0,112.0,110.0,108.0,109.0,108.0,107.0,106.0,107.0,106.0,105.0,106.0,107.0,108.0,105.0,104.0], labels:['Jan 2024','Jul 2024','Jan 2025','Jul 2025','Apr 2026'], pp:'+8495.1%', sp:'+4.0%' },
+};
+
+// Real position weights from portfolio.json
+const ALLOC = [
+  { label:'AMZN',  pct:0.3705, col:'#58a6ff' },
+  { label:'SOL',   pct:0.2709, col:'#f0883e' },
+  { label:'ETH',   pct:0.2489, col:'#8957e5' },
+  { label:'DOGE',  pct:0.0772, col:'#3fb950' },
+  { label:'SUI',   pct:0.0325, col:'#8b949e' },
+];
+
+let currentPeriod = '1M';
+
+// ─────────────────────────────────────────────────────────
+// API BASE — works both locally (node server.js) and on Vercel
+// ─────────────────────────────────────────────────────────
+const API_BASE = (
+  window.location.protocol === 'file:' ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? 'http://localhost:3001' : '';
+
+// ─────────────────────────────────────────────────────────
+// WATCHLIST STATE
+// ─────────────────────────────────────────────────────────
+let watchlist = [
+  { ticker:'SPY',      name:'S&P 500 ETF',   yf:'SPY',       price:null, day:null },
+  { ticker:'QQQ',      name:'NASDAQ 100 ETF', yf:'QQQ',       price:null, day:null },
+  { ticker:'GLD',      name:'Gold ETF',        yf:'GLD',       price:null, day:null },
+  { ticker:'TLT',      name:'20Y Bond ETF',    yf:'TLT',       price:null, day:null },
+  { ticker:'BTC',      name:'Bitcoin (AUD)',   yf:'BTC-AUD',   price:null, day:null },
+  { ticker:'^VIX',     name:'CBOE VIX',        yf:'^VIX',      price:null, day:null },
+  { ticker:'AUDUSD',   name:'AUD/USD',          yf:'AUDUSD=X',  price:null, day:null },
+];
+
+// ─────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────
+
+const $  = id => document.getElementById(id);
+const fmtNum = (n, dec=2) => Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const sign   = n => n >= 0 ? '+' : '-';
+const signPfx = n => n >= 0 ? '+' : '';
+const gainCls = n => n >= 0 ? 'text-[#3fb950]' : 'text-[#f85149]';
+
+
+// ─────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────
+
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  $('view-' + v).classList.add('active');
+  $('nav-'  + v).classList.add('active');
+  const labels = { portfolio:'Terminal / Portfolio Overview', markets:'Terminal / Markets Overview', macro:'Terminal / Macro Intelligence', watchlist:'Terminal / Watchlist' };
+  $('header-bc').textContent = labels[v] || v;
+  if (v === 'watchlist' && watchlist.every(w => w.price === null)) refreshWatchlist();
+}
+
+
+// ─────────────────────────────────────────────────────────
+// PORTFOLIO
+// ─────────────────────────────────────────────────────────
+
+function calcHolding(h) {
+  const mktVal  = h.shares * h.price;
+  const cost    = h.shares * h.avgCost;
+  const retAmt  = mktVal - cost;
+  const retPct  = (h.price - h.avgCost) / h.avgCost * 100;
+  const dayPnL  = mktVal * h.day / 100;
+  return { mktVal, cost, retAmt, retPct, dayPnL };
+}
+
+function renderHoldings() {
+  const tbody = $('holdings-body');
+  tbody.innerHTML = holdings.map((h, i) => {
+    const { mktVal, retPct, dayPnL } = calcHolding(h);
+    const bg = i % 2 === 0 ? 'bg-[#161b22]' : 'bg-[#0d1117]';
+    return `
+      <tr class="${bg} holding-row h-11 border-b border-[#21262d]/30 hover:bg-[#1c2026] transition-colors">
+        <td class="px-4 font-bold text-[#58a6ff]">${h.ticker}</td>
+        <td class="px-3 text-[#8b949e] text-[11px]">${h.name}</td>
+        <td class="px-3 text-right">${h.shares < 10 ? h.shares.toFixed(4) : h.shares >= 100 ? h.shares.toFixed(2) : h.shares.toFixed(3)}</td>
+        <td class="px-3 text-right">${h.avgCost < 1 ? '$' + h.avgCost.toFixed(4) : '$' + fmtNum(h.avgCost)}</td>
+        <td class="px-3 text-right">${h.price < 1 ? '$' + h.price.toFixed(4) : '$' + fmtNum(h.price)}</td>
+        <td class="px-3 text-right font-bold">A$${Math.round(mktVal).toLocaleString()}</td>
+        <td class="px-3 text-right ${gainCls(h.day)}">${signPfx(h.day)}${h.day.toFixed(3)}%</td>
+        <td class="px-3 text-right ${gainCls(retPct)} font-bold">${signPfx(retPct)}${retPct.toFixed(1)}%</td>
+        <td class="px-2">
+          <button class="del-btn text-[#8b949e] hover:text-[#f85149] transition-colors" onclick="removeHolding(${i})">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function renderSummary() {
+  let totVal = 0, totCost = 0, totDayPnL = 0;
+  holdings.forEach(h => {
+    const s = calcHolding(h);
+    totVal    += s.mktVal;
+    totCost   += s.cost;
+    totDayPnL += s.dayPnL;
+  });
+  const totRet    = totVal - totCost;
+  const totRetPct = totCost > 0 ? totRet / totCost * 100 : 0;
+  const dayPct    = (totVal - totDayPnL) > 0 ? totDayPnL / (totVal - totDayPnL) * 100 : 0;
+
+  $('s-total-value').textContent = 'A$' + fmtNum(totVal);
+  $('s-day-pnl').textContent     = sign(totDayPnL) + 'A$' + fmtNum(Math.abs(totDayPnL));
+  $('s-day-pct').textContent     = signPfx(dayPct) + dayPct.toFixed(2) + '%';
+  $('s-total-ret').textContent   = sign(totRet) + 'A$' + fmtNum(Math.abs(totRet));
+  $('s-total-ret-pct').textContent = signPfx(totRetPct) + totRetPct.toFixed(2) + '%';
+
+  $('s-day-pnl').className     = `text-2xl mono font-bold ${gainCls(totDayPnL)}`;
+  $('s-day-pct').className     = `text-xs mono font-medium ${gainCls(totDayPnL)}`;
+  $('s-total-ret').className   = `text-2xl mono font-bold ${gainCls(totRet)}`;
+  $('s-total-ret-pct').className = `text-xs mono font-medium ${gainCls(totRet)}`;
+}
+
+function renderMovers() {
+  const sorted = [...holdings].sort((a,b) => b.day - a.day);
+  const win = sorted.filter(h => h.day > 0).slice(0,3);
+  const los = sorted.filter(h => h.day < 0).slice(0,2);
+
+  $('winners-list').innerHTML = win.map(h => `
+    <div class="flex items-center justify-between text-xs mono border-l-2 border-[#3fb950]/40 bg-[#3fb950]/5 px-2 py-1.5">
+      <div><div class="font-bold text-white">${h.ticker}</div><div class="text-[9px] text-[#8b949e]">${h.name}</div></div>
+      <span class="text-[#3fb950] font-bold">+${h.day.toFixed(3)}%</span>
+    </div>`).join('');
+
+  $('losers-list').innerHTML = los.map(h => `
+    <div class="flex items-center justify-between text-xs mono border-l-2 border-[#f85149]/40 bg-[#f85149]/5 px-2 py-1.5">
+      <div><div class="font-bold text-white">${h.ticker}</div><div class="text-[9px] text-[#8b949e]">${h.name}</div></div>
+      <span class="text-[#f85149] font-bold">${h.day.toFixed(3)}%</span>
+    </div>`).join('');
+}
+
+function renderHealth() {
+  // Herfindahl-Hirschman Index (lower = more diverse; 1 = perfectly concentrated)
+  const weights = holdings.map(h => (h.shares * h.price));
+  const total   = weights.reduce((a, b) => a + b, 0) || 1;
+  const hhi     = weights.reduce((sum, w) => sum + (w/total)**2, 0);
+  // hhi ranges 0.2 (perfect 5-way split) to 1.0 (one asset)
+  // Map to score 0–100: 1 hhi → 0, 0.2 hhi → 85
+  let score   = Math.round(Math.max(0, Math.min(100, (1 - hhi) / 0.8 * 85)));
+  const label = score >= 75 ? 'Well Diversified' : score >= 55 ? 'Moderate' : score >= 35 ? 'Concentrated' : 'High Risk';
+  const scoreCol = score >= 75 ? '#3fb950' : score >= 55 ? '#f0883e' : '#f85149';
+  $('health-score').textContent = score;
+  $('health-score').style.color = scoreCol;
+  $('health-label').textContent = label;
+  $('health-label').style.color = scoreCol;
+  $('health-bar').style.width   = score + '%';
+  $('health-bar').style.background = `linear-gradient(to right, ${scoreCol}aa, ${scoreCol})`;
+}
+
+function renderDonut() {
+  const g   = $('donut-g');
+  const r   = 36, cx = 48, cy = 48;
+  const C   = 2 * Math.PI * r;
+  let cumPct = 0;
+  g.innerHTML = ALLOC.map(a => {
+    const dash   = a.pct * C;
+    const offset = -cumPct * C;
+    cumPct += a.pct;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${a.col}"
+              stroke-width="10" stroke-dasharray="${dash} ${C}" stroke-dashoffset="${offset}"/>`;
+  }).join('');
+
+  $('donut-count').textContent = holdings.length;
+
+  $('alloc-legend').innerHTML = ALLOC.map(a => `
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 flex-shrink-0" style="background:${a.col}"></div>
+        <span class="text-[10px] text-[#8b949e]">${a.label}</span>
+      </div>
+      <span class="text-[11px] mono font-bold">${Math.round(a.pct*100)}%</span>
+    </div>`).join('');
+}
+
+
+// ─────────────────────────────────────────────────────────
+// PERFORMANCE CHART
+// ─────────────────────────────────────────────────────────
+
+function makePath(data, W, H, pad=4) {
+  const lo = Math.min(...data), hi = Math.max(...data), rng = (hi - lo) || 1;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = pad + (H - pad * 2) * (1 - (v - lo) / rng);
+    return [x, y];
+  });
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const mx = (pts[i-1][0] + pts[i][0]) / 2;
+    d += ` C ${mx} ${pts[i-1][1]} ${mx} ${pts[i][1]} ${pts[i][0]} ${pts[i][1]}`;
+  }
+  const fill = d + ` L ${pts[pts.length-1][0]} ${H} L ${pts[0][0]} ${H} Z`;
+  return { line: d, fill };
+}
+
+function renderChart(period) {
+  const cd  = CHART_DATA[period];
+  const svg = $('perf-svg');
+  const W   = svg.getBoundingClientRect().width || 600;
+  const H   = 180;
+
+  const port  = makePath(cd.port,  W, H);
+  const bench = makePath(cd.bench, W, H);
+
+  $('port-fill').setAttribute('d', port.fill);
+  $('port-line').setAttribute('d', port.line);
+  $('bench-line').setAttribute('d', bench.line);
+
+  // X labels
+  const labels = cd.labels;
+  $('x-labels').innerHTML = labels.map(l => `<span>${l}</span>`).join('');
+
+  // Legend
+  $('port-lbl').textContent = cd.pp;
+  $('port-lbl').className   = 'font-bold ' + (parseFloat(cd.pp) >= 0 ? 'text-[#3fb950]' : 'text-[#f85149]');
+  $('sp-lbl').textContent   = cd.sp;
+  $('sp-lbl').className     = 'font-bold ' + (parseFloat(cd.sp) >= 0 ? 'text-[#3fb950]' : 'text-[#f85149]');
+}
+
+function setPeriod(p) {
+  currentPeriod = p;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === p);
+  });
+  renderChart(p);
+}
+
+
+// ─────────────────────────────────────────────────────────
+// MARKETS
+// ─────────────────────────────────────────────────────────
+
+function heatColor(v) {
+  if (v > 10)  return 'rgba(63,185,80,.70)';
+  if (v >  5)  return 'rgba(63,185,80,.50)';
+  if (v >  2)  return 'rgba(63,185,80,.35)';
+  if (v >  0)  return 'rgba(63,185,80,.18)';
+  if (v > -2)  return 'rgba(248,81,73,.18)';
+  if (v > -5)  return 'rgba(248,81,73,.35)';
+  if (v > -10) return 'rgba(248,81,73,.50)';
+  return 'rgba(248,81,73,.70)';
+}
+
+function heatTextColor(v) {
+  return Math.abs(v) > 4 ? '#fff' : v >= 0 ? '#3fb950' : '#f85149';
+}
+
+function renderMarkets() {
+  // Index strip
+  $('index-strip').innerHTML = INDICES.map(idx => `
+    <div class="bg-[#1c2026] p-3 h-[74px] flex flex-col justify-between hover:bg-[#262a31] transition-colors cursor-default">
+      <span class="text-[10px] uppercase tracking-wider text-[#8b949e]">${idx.name}</span>
+      <div class="flex items-baseline gap-2">
+        <span class="mono text-sm font-bold">${idx.val}</span>
+        <span class="mono text-[10px] font-bold ${gainCls(idx.chg)}">${signPfx(idx.chg)}${idx.chg}%</span>
+      </div>
+    </div>`).join('');
+
+  // Heatmap
+  $('heatmap-body').innerHTML = HEATMAP.map(row => `
+    <tr class="border-b border-[#21262d]/20">
+      <td class="py-2 pr-4 text-[#e6edf3] font-semibold text-[11px]">${row.name}</td>
+      ${[row.d, row.w, row.m, row.ytd].map(v => `
+        <td class="p-1">
+          <div class="heat-cell text-center py-1.5 text-[10px] mono font-bold"
+               style="background:${heatColor(v)};color:${heatTextColor(v)}">
+            ${signPfx(v)}${v}%
+          </div>
+        </td>`).join('')}
+    </tr>`).join('');
+
+  // Sector bars
+  const mx = Math.max(...SECTORS.map(s => Math.abs(s.v)));
+  $('sector-bars').innerHTML = SECTORS.map(s => `
+    <div class="space-y-0.5">
+      <div class="flex justify-between text-[10px] mono">
+        <span class="text-[#e6edf3]">${s.n}</span>
+        <span class="${gainCls(s.v)} font-bold">${signPfx(s.v)}${s.v}%</span>
+      </div>
+      <div class="w-full bg-[#21262d] h-1 relative">
+        <div class="h-full ${s.v >= 0 ? 'bg-[#3fb950]' : 'bg-[#f85149] ml-auto'}"
+             style="width:${(Math.abs(s.v)/mx*100).toFixed(1)}%"></div>
+      </div>
+    </div>`).join('');
+
+  // Gainers/losers
+  $('mkt-gainers').innerHTML = GAINERS.map(g => `
+    <div class="flex justify-between items-center text-[11px] mono">
+      <div><span class="font-bold text-[#e6edf3]">${g.t}</span>
+           <span class="text-[#8b949e] ml-1 text-[10px]">${g.n}</span></div>
+      <span class="text-[#3fb950] font-bold">+${g.chg}%</span>
+    </div>`).join('');
+
+  $('mkt-losers').innerHTML = LOSERS.map(l => `
+    <div class="flex justify-between items-center text-[11px] mono">
+      <div><span class="font-bold text-[#e6edf3]">${l.t}</span>
+           <span class="text-[#8b949e] ml-1 text-[10px]">${l.n}</span></div>
+      <span class="text-[#f85149] font-bold">${l.chg}%</span>
+    </div>`).join('');
+
+  // FX
+  $('fx-rows').innerHTML = FX.map(fx => `
+    <div class="grid grid-cols-4 py-2.5 items-center text-[11px]">
+      <span class="font-bold">${fx.p}</span>
+      <span class="mono text-center">${fx.r}</span>
+      <span class="mono text-center ${gainCls(fx.d)} font-medium">${signPfx(fx.d)}${fx.d}%</span>
+      <span class="mono text-right text-[#8b949e] text-[10px]">${signPfx(fx.m)}${fx.m}% 1M</span>
+    </div>`).join('');
+}
+
+
+// ─────────────────────────────────────────────────────────
+// MACRO
+// ─────────────────────────────────────────────────────────
+
+function renderMacro() {
+  // Indicators
+  $('indicators-list').innerHTML = INDICATORS.map(ind => `
+    <div class="flex justify-between items-center py-3 border-b border-[#21262d]/40 last:border-0">
+      <div>
+        <p class="text-[9px] text-[#8b949e] uppercase tracking-wider mb-0.5">${ind.n}</p>
+        <p class="mono text-sm font-bold">${ind.v}</p>
+      </div>
+      <span class="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${ind.bc}">${ind.b}</span>
+    </div>`).join('');
+
+  // Central banks
+  $('cb-list').innerHTML = CB.map(cb => `
+    <div class="flex items-center justify-between bg-[#181c22] px-3 py-2.5 hover:bg-[#262a31] transition-colors">
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-bold w-9 text-[#e6edf3]">${cb.bank}</span>
+        <span class="text-[10px] mono text-[#8b949e]">${cb.rate}</span>
+      </div>
+      <span class="text-[10px] text-[#8b949e]">${cb.meet}</span>
+      <span class="text-[10px] font-bold ${cb.ac}">${cb.act}</span>
+    </div>`).join('');
+
+  // Briefing
+  $('briefing').innerHTML = BRIEFING.map((s, i) => `
+    <div class="flex gap-3 ${i === 3 ? 'border-t border-[#21262d]/40 pt-4' : ''}">
+      <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center"
+           style="background:${s.col}12">
+        <span class="material-symbols-outlined text-base" style="color:${s.col}">${s.icon}</span>
+      </div>
+      <div>
+        <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1.5" style="color:${s.col}">${s.label}</h3>
+        <p class="text-[#8b949e] text-xs leading-relaxed">${s.text}</p>
+      </div>
+    </div>`).join('');
+
+  // Geography
+  $('geo-list').innerHTML = GEO.map(g => `
+    <div class="flex items-center justify-between bg-[#181c22] px-3 py-2.5 hover:bg-[#262a31] transition-colors">
+      <div class="flex items-center gap-2">
+        <span class="text-base">${g.flag}</span>
+        <div>
+          <div class="text-xs font-bold">${g.n}</div>
+          <div class="text-[9px] text-[#8b949e] italic">${g.note}</div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-[10px] font-bold ${g.sc}">${g.snt}</div>
+        <div class="text-[9px] mono text-[#8b949e]">${g.idx}</div>
+      </div>
+    </div>`).join('');
+
+  // Calendar
+  $('calendar-body').innerHTML = CALENDAR.map(e => {
+    const dot = e.imp === 'high'
+      ? 'bg-[#f85149] shadow-[0_0_6px_rgba(248,81,73,.5)]'
+      : 'bg-yellow-500 shadow-[0_0_6px_rgba(234,179,8,.4)]';
+    const bg = e.imp === 'high' ? 'bg-[#f85149]/5' : '';
+    return `
+      <tr class="${bg} hover:bg-[#262a31] transition-colors">
+        <td class="py-2.5 pr-2 font-semibold text-[#e6edf3]">${e.ev}</td>
+        <td class="py-2.5 text-center"><span class="w-2 h-2 rounded-full ${dot} inline-block"></span></td>
+        <td class="py-2.5 text-right text-[#8b949e]">${e.est}</td>
+      </tr>`;
+  }).join('');
+}
+
+
+// ─────────────────────────────────────────────────────────
+// ADD / REMOVE POSITIONS
+// ─────────────────────────────────────────────────────────
+
+function openModal()  { $('add-modal').classList.add('open'); }
+function closeModal() { $('add-modal').classList.remove('open'); }
+
+function addPosition() {
+  const ticker  = $('f-ticker').value.trim().toUpperCase();
+  const name    = $('f-name').value.trim();
+  const shares  = parseFloat($('f-shares').value);
+  const avgCost = parseFloat($('f-cost').value);
+  const price   = parseFloat($('f-price').value);
+  const day     = parseFloat($('f-day').value) || 0;
+  const cat     = $('f-cat').value;
+
+  if (!ticker || !name || isNaN(shares) || isNaN(avgCost) || isNaN(price)) {
+    alert('Please fill in Ticker, Name, Shares, Avg Cost, and Current Price.');
+    return;
+  }
+
+  holdings.push({ ticker, name, shares, avgCost, price, day, cat });
+  renderAll();
+  closeModal();
+  ['f-ticker','f-name','f-shares','f-cost','f-price','f-day'].forEach(id => { $(id).value = ''; });
+}
+
+function removeHolding(i) {
+  holdings.splice(i, 1);
+  renderAll();
+}
+
+
+// ─────────────────────────────────────────────────────────
+// CHART TOOLTIPS
+// ─────────────────────────────────────────────────────────
+
+// Store current period's SVG point positions for hit-testing
+let _chartPts = [];
+
+// Called from renderChart — record the points so tooltip can use them
+function storeChartPoints(pts) { _chartPts = pts; }
+
+function chartMouseMove(e) {
+  const svg  = $('perf-svg');
+  const rect = svg.getBoundingClientRect();
+  const xPx  = e.clientX - rect.left;
+  const xPct = xPx / rect.width;
+
+  const cd  = CHART_DATA[currentPeriod];
+  const n   = cd.port.length;
+  const idx = Math.max(0, Math.min(n - 1, Math.round(xPct * (n - 1))));
+
+  // Calculate y position from stored points
+  const W = rect.width, H = 180, pad = 4;
+  const lo = Math.min(...cd.port), hi = Math.max(...cd.port), rng = (hi - lo) || 1;
+  const yPx = pad + (H - pad * 2) * (1 - (cd.port[idx] - lo) / rng);
+
+  // Crosshair
+  const xSvg = (pad + (idx / (n - 1)) * (W - pad * 2)) / W * 100 + '%';
+  const ch   = $('chart-crosshair');
+  const dot  = $('chart-dot');
+  ch.setAttribute('x1', xSvg); ch.setAttribute('x2', xSvg);
+  ch.style.display = 'block';
+  dot.setAttribute('cx', xSvg); dot.setAttribute('cy', yPx);
+  dot.style.display = 'block';
+
+  // Tooltip
+  const tt   = $('chart-tooltip');
+  const portVal = cd.port[idx];
+  const chg     = portVal - 100;
+  // Find the closest label
+  const lblIdx  = Math.round(idx / (n - 1) * (cd.labels.length - 1));
+  $('tt-label').textContent = cd.labels[lblIdx] || '';
+  $('tt-port').textContent  = (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%';
+  $('tt-port').style.color  = chg >= 0 ? '#3fb950' : '#f85149';
+
+  const ttLeft = Math.max(40, Math.min(rect.width - 40, xPx));
+  tt.style.left    = ttLeft + 'px';
+  tt.style.top     = Math.max(0, yPx - 28) + 'px';
+  tt.classList.remove('hidden');
+}
+
+function chartMouseLeave() {
+  $('chart-tooltip').classList.add('hidden');
+  $('chart-crosshair').style.display = 'none';
+  $('chart-dot').style.display       = 'none';
+}
+
+
+// ─────────────────────────────────────────────────────────
+// WATCHLIST
+// ─────────────────────────────────────────────────────────
+
+function renderWatchlist() {
+  const tbody = $('watchlist-body');
+  const empty = $('watchlist-empty');
+  if (!watchlist.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  tbody.innerHTML = watchlist.map((w, i) => {
+    const price   = w.price;
+    const day     = w.day;
+    const priceFmt = price == null ? '—'
+      : price < 1     ? '$' + price.toFixed(4)
+      : price < 100   ? '$' + price.toFixed(3)
+      : '$' + fmtNum(price);
+    const dayFmt  = day   == null ? '—'   : (day >= 0 ? '+' : '') + day.toFixed(3) + '%';
+    const dayCls  = day   == null ? 'text-[#8b949e]' : gainCls(day);
+
+    // Mini trend bar (placeholder sparkline — 5 random-ish bars based on day)
+    const spark = day == null ? '' : [0.3,0.6,0.4,0.8,0.6,1.0].map((h, j) => {
+      const barH = Math.round(h * 14) + 2;
+      const col  = day >= 0 ? '#3fb950' : '#f85149';
+      return `<rect x="${j*6}" y="${18-barH}" width="4" height="${barH}" fill="${col}" opacity="${0.3 + h * 0.5}"/>`;
+    }).join('');
+
+    const bg = i % 2 === 0 ? 'bg-[#161b22]' : 'bg-[#0d1117]';
+    return `
+      <tr class="${bg} h-11 border-b border-[#21262d]/30 hover:bg-[#1c2026] transition-colors">
+        <td class="px-4 font-bold text-[#58a6ff]">${w.ticker}</td>
+        <td class="px-3 text-[#8b949e] text-[11px]">${w.name}</td>
+        <td class="px-3 text-right font-bold">${priceFmt}</td>
+        <td class="px-3 text-right ${dayCls} font-bold">${dayFmt}</td>
+        <td class="px-3 text-right">
+          ${spark ? `<svg width="36" height="18" style="vertical-align:middle">${spark}</svg>` : '—'}
+        </td>
+        <td class="px-2">
+          <button class="text-[#8b949e] hover:text-[#f85149] transition-colors opacity-0 group-hover:opacity-100"
+                  style="opacity:0;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0"
+                  onclick="removeWatchlistItem(${i})">
+            <span class="material-symbols-outlined text-sm">close</span>
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  // Make delete buttons visible on row hover via CSS
+  document.querySelectorAll('#watchlist-body tr').forEach(row => {
+    const btn = row.querySelector('button');
+    if (!btn) return;
+    row.addEventListener('mouseenter', () => btn.style.opacity = '1');
+    row.addEventListener('mouseleave', () => btn.style.opacity = '0');
+  });
+}
+
+async function refreshWatchlist() {
+  const icon = $('wl-refresh-icon');
+  icon.classList.add('spinning');
+
+  const symbols = watchlist.map(w => w.yf);
+  try {
+    const res = await fetch(`${API_BASE}/api/prices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbols }),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const { prices, changes } = await res.json();
+    watchlist = watchlist.map(w => ({
+      ...w,
+      price: prices[w.yf]  ?? w.price,
+      day:   changes[w.yf] ?? w.day,
+    }));
+  } catch (err) {
+    console.warn('[Watchlist] Fetch failed:', err.message);
+  }
+
+  renderWatchlist();
+  setTimeout(() => icon.classList.remove('spinning'), 400);
+}
+
+function addWatchlistItem() {
+  const input  = $('wl-input');
+  const symbol = input.value.trim().toUpperCase();
+  if (!symbol) return;
+  if (watchlist.find(w => w.yf.toUpperCase() === symbol || w.ticker === symbol)) {
+    input.value = ''; return;
+  }
+  // Derive a friendly ticker (strip suffix like -AUD, =X)
+  const ticker = symbol.replace(/-AUD$/,'').replace(/=X$/,'').replace(/\^/,'');
+  watchlist.push({ ticker, name: symbol, yf: symbol, price: null, day: null });
+  input.value = '';
+  refreshWatchlist();
+}
+
+function removeWatchlistItem(i) {
+  watchlist.splice(i, 1);
+  renderWatchlist();
+}
+
+
+// ─────────────────────────────────────────────────────────
+// MACRO AI BRIEFING
+// ─────────────────────────────────────────────────────────
+
+let _macroCached = null;  // cache last result in session
+
+async function generateBriefing() {
+  const btn      = $('gen-btn');
+  const icon     = $('gen-icon');
+  const label    = $('gen-label');
+  const loading  = $('briefing-loading');
+  const errorEl  = $('briefing-error');
+  const briefEl  = $('briefing');
+  const headline = $('macro-headline');
+  const edition  = $('macro-edition');
+
+  btn.disabled = true;
+  icon.textContent = 'hourglass_empty';
+  label.textContent = 'Generating…';
+  loading.classList.remove('hidden');
+  briefEl.classList.add('hidden');
+  errorEl.classList.add('hidden');
+  headline.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/macro`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({}),  // API key comes from server env
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const { briefing, indicators } = await res.json();
+    _macroCached = { briefing, indicators };
+
+    // Render headline
+    if (briefing.headline) {
+      headline.textContent = briefing.headline;
+      headline.classList.remove('hidden');
+    }
+
+    // Edition line with live data
+    const now = new Date().toLocaleString('en-AU', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    edition.textContent = now + ' — AI Edition';
+
+    // Update left-panel indicators with real data
+    if (indicators) updateIndicatorsFromMacro(indicators);
+
+    // Render AI sections
+    briefEl.innerHTML = (briefing.sections || []).map((s, i) => `
+      <div class="flex gap-3 ${i > 0 ? 'border-t border-[#21262d]/30 pt-4' : ''}">
+        <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center"
+             style="background:${s.color}12">
+          <span class="material-symbols-outlined text-base" style="color:${s.color}">${s.icon}</span>
+        </div>
+        <div>
+          <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1.5" style="color:${s.color}">${s.label}</h3>
+          <p class="text-[#8b949e] text-xs leading-relaxed">${s.text}</p>
+        </div>
+      </div>`).join('');
+
+    briefEl.classList.remove('hidden');
+  } catch (err) {
+    errorEl.textContent = 'Error: ' + err.message;
+    errorEl.classList.remove('hidden');
+    briefEl.classList.remove('hidden');
+    console.error('[Macro] Briefing failed:', err);
+  }
+
+  loading.classList.add('hidden');
+  btn.disabled   = false;
+  icon.textContent  = 'auto_awesome';
+  label.textContent = 'Regenerate';
+}
+
+function updateIndicatorsFromMacro(ind) {
+  // Update the static INDICATORS array with real data, then re-render
+  const map = [
+    { idx: 0, key: 'sp500', chgKey: 'sp500_chg', label: 'S&P 500' },
+    { idx: 1, key: 'vix',   label: 'VIX' },
+    { idx: 2, key: 'tnx',   label: '10Y Yield' },
+    { idx: 3, key: 'audusd',label: 'AUD/USD' },
+  ];
+  map.forEach(({ idx, key, chgKey }) => {
+    if (!INDICATORS[idx] || !ind[key]) return;
+    INDICATORS[idx].v = ind[key];
+    if (chgKey && ind[chgKey]) {
+      const chg = parseFloat(ind[chgKey]);
+      INDICATORS[idx].b  = chg >= 0 ? 'BULLISH' : 'BEARISH';
+      INDICATORS[idx].bc = chg >= 0 ? 'bg-[#3fb950]/10 text-[#3fb950]' : 'bg-[#f85149]/10 text-[#f85149]';
+    }
+  });
+  renderMacro();
+}
+
+
+// ─────────────────────────────────────────────────────────
+// REFRESH (simulated live tick)
+// ─────────────────────────────────────────────────────────
+
+async function refreshData() {
+  const icon = $('refresh-icon');
+  const btn  = $('refresh-btn');
+  icon.classList.add('spinning');
+  btn.disabled = true;
+
+  // AMZN is priced in USD by Yahoo Finance — fetch AUDUSD=X to convert to AUD
+  const symbols = [...new Set([...holdings.map(h => h.yf), 'AUDUSD=X'])];
+
+  try {
+    const res = await fetch(`${API_BASE}/api/prices`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ symbols }),
+    });
+
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const { prices, changes } = await res.json();
+
+    // AUD/USD rate — e.g. 0.63 means 1 AUD = 0.63 USD, so 1 USD = 1/0.63 AUD
+    const audusd = prices['AUDUSD=X'] || null;
+
+    holdings = holdings.map(h => {
+      let newPrice  = prices[h.yf];
+      let newChange = changes[h.yf];
+
+      // Convert USD-priced assets to AUD
+      if (newPrice != null && h.currency === 'USD' && audusd) {
+        newPrice = newPrice / audusd;
+        // day change % is already dimensionless — no conversion needed
+      }
+
+      return {
+        ...h,
+        price: newPrice  != null ? +newPrice.toFixed(4)  : h.price,
+        day:   newChange != null ? +newChange.toFixed(3)  : h.day,
+      };
+    });
+
+    if (audusd) $('audusd-rate').textContent = `AUD/USD ${audusd.toFixed(4)}`;
+    console.log('[PortfolioOS] Prices refreshed from Yahoo Finance. AUD/USD:', audusd);
+    $('server-dot').style.background = '#3fb950';
+    $('server-dot').classList.add('live-dot');
+    $('server-lbl').textContent = 'Live';
+    $('server-lbl').style.color = '#3fb950';
+  } catch (err) {
+    $('server-dot').style.background = '#f0883e';
+    $('server-dot').classList.remove('live-dot');
+    $('server-lbl').textContent = 'Offline';
+    $('server-lbl').style.color = '#8b949e';
+    console.warn('[PortfolioOS] Proxy unreachable — run: node server.js. Error:', err.message);
+    // Graceful fallback: tiny random jitter so UI still feels responsive
+    holdings = holdings.map(h => ({
+      ...h,
+      price: +(h.price * (1 + (Math.random() - 0.49) * 0.002)).toFixed(4),
+      day:   +(h.day   + (Math.random() - 0.5) * 0.05).toFixed(3),
+    }));
+  }
+
+  renderHoldings();
+  renderSummary();
+  renderMovers();
+  renderChart(currentPeriod);
+
+  setTimeout(() => {
+    icon.classList.remove('spinning');
+    btn.disabled = false;
+  }, 400);
+}
+
+
+// ─────────────────────────────────────────────────────────
+// CLOCK
+// ─────────────────────────────────────────────────────────
+
+function tick() {
+  $('clock').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+
+
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+
+function renderAll() {
+  renderHoldings();
+  renderSummary();
+  renderMovers();
+  renderHealth();
+  renderDonut();
+}
+
+async function checkServerStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    if (res.ok) {
+      $('server-dot').style.background = '#3fb950';
+      $('server-dot').classList.add('live-dot');
+      $('server-lbl').textContent = 'Live';
+      $('server-lbl').style.color = '#3fb950';
+    }
+  } catch {
+    // stays Offline — which is the default state set in HTML
+  }
+}
+
+function init() {
+  renderAll();
+  renderMarkets();
+  renderMacro();
+  tick();
+  setInterval(tick, 15000);
+  setTimeout(() => renderChart('1M'), 80);  // wait for SVG layout
+  setTimeout(checkServerStatus, 500);       // ping proxy server
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
