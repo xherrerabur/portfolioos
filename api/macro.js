@@ -14,19 +14,30 @@ function fetchYahooV7(symbols) {
   return new Promise((resolve, reject) => {
     const qs     = symbols.map(encodeURIComponent).join('%2C');
     const fields = 'regularMarketPrice%2CregularMarketChangePercent%2Csymbol';
-    const url    = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${qs}&fields=${fields}`;
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+    // Try query2 first (less blocked from server environments)
+    const url    = `https://query2.finance.yahoo.com/v8/finance/quote?symbols=${qs}&fields=${fields}`;
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Origin': 'https://finance.yahoo.com',
+        'Referer': 'https://finance.yahoo.com/',
+      }
+    };
+    https.get(url, options, (res) => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => {
         try {
-          const r = JSON.parse(d)?.quoteResponse?.result || [];
+          const parsed = JSON.parse(d);
+          const r = parsed?.quoteResponse?.result || parsed?.quoteResponse?.result || [];
           const prices = {}, changes = {};
           r.forEach(q => { prices[q.symbol] = q.regularMarketPrice ?? null; changes[q.symbol] = q.regularMarketChangePercent ?? null; });
           resolve({ prices, changes });
-        } catch (e) { reject(e); }
+        } catch (e) { resolve({ prices: {}, changes: {} }); } // graceful fallback
       });
-    }).on('error', reject);
+    }).on('error', () => resolve({ prices: {}, changes: {} })); // graceful fallback
   });
 }
 
@@ -90,6 +101,11 @@ Return ONLY valid JSON (no markdown):
 {"headline":"One-line regime summary max 10 words","sections":[{"icon":"monitoring","color":"#3fb950","label":"EQUITIES","text":"2-3 sentences"},{"icon":"currency_bitcoin","color":"#f0883e","label":"CRYPTO","text":"2-3 sentences"},{"icon":"account_balance","color":"#58a6ff","label":"RATES & BONDS","text":"2-3 sentences"},{"icon":"public","color":"#8b949e","label":"MACRO & FX","text":"2-3 sentences"}]}`;
 
     const result = await callClaude(prompt, apiKey);
+    // Surface Claude API errors explicitly (e.g. credit balance too low, invalid key)
+    if (result?.type === 'error' || !result?.content) {
+      const errMsg = result?.error?.message || `Unexpected response: ${JSON.stringify(result).substring(0, 200)}`;
+      return res.status(500).json({ error: `Claude API error: ${errMsg}` });
+    }
     const raw    = result?.content?.[0]?.text || '';
     let briefing;
     try { briefing = JSON.parse(raw.replace(/^```[a-z]*\n?/i,'').replace(/\n?```$/i,'').trim()); }
