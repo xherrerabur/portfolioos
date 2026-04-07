@@ -84,7 +84,7 @@ LIVE MARKET DATA:
 - USD Index: ${m.usd} (${m.usd_chg}% today) | AUD/USD: ${m.audusd}
 - Bitcoin: A$${m.btc} (${m.btc_chg}% today) | Ethereum: A$${m.eth} (${m.eth_chg}% today) | Solana: A$${m.sol} (${m.sol_chg}% today)
 
-PORTFOLIO CONTEXT: 63% crypto (SOL, ETH, DOGE, SUI), 37% US equities (AMZN). NAV A$13,082. Down -37.5% from cost basis.
+PORTFOLIO CONTEXT: 82% crypto (SOL, ETH, DOGE, SUI), 18% US equities (AMZN). Total cost basis A$25,959. Portfolio is AUD-denominated.
 
 Return ONLY valid JSON (no markdown):
 {"headline":"One-line regime summary max 10 words","sections":[{"icon":"monitoring","color":"#3fb950","label":"EQUITIES","text":"2-3 sentences"},{"icon":"currency_bitcoin","color":"#f0883e","label":"CRYPTO","text":"2-3 sentences"},{"icon":"account_balance","color":"#58a6ff","label":"RATES & BONDS","text":"2-3 sentences"},{"icon":"public","color":"#8b949e","label":"MACRO & FX","text":"2-3 sentences"}]}`;
