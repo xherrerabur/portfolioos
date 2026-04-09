@@ -3,570 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortfolioOS - Hedge Fund Decision Engine</title>
+    <title>PortfolioOS — Hedge Fund Decision Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg-primary: #0d1117;
-            --bg-secondary: #161b22;
-            --bg-tertiary: #21262d;
-            --border: #30363d;
-            --text-primary: #c9d1d9;
-            --text-secondary: #8b949e;
-            --text-muted: #6e7681;
-            --green: #3fb950;
-            --red: #f85149;
-            --blue: #58a6ff;
-            --orange: #f0883e;
-            --purple: #8957e5;
-            --yellow: #d29922;
+            --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-tertiary: #21262d;
+            --border: #30363d; --text-primary: #c9d1d9; --text-secondary: #8b949e; --text-muted: #6e7681;
+            --green: #3fb950; --red: #f85149; --blue: #58a6ff; --orange: #f0883e; --purple: #8957e5; --yellow: #d29922;
         }
-
-        body {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            overflow: hidden;
-            height: 100vh;
-        }
-
-        .container {
-            display: flex;
-            height: 100vh;
-            flex-direction: column;
-        }
+        body { font-family: 'JetBrains Mono', monospace; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; height: 100vh; }
+        .container { display: flex; height: 100vh; flex-direction: column; }
 
         /* Status Bar */
-        .status-bar {
-            height: 32px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            font-size: 11px;
-            gap: 20px;
-            flex-shrink: 0;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .status-badge {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--green);
-        }
-
-        .status-badge.offline {
-            background: var(--red);
-        }
-
-        .status-value {
-            color: var(--text-secondary);
-        }
+        .status-bar { height: 32px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; font-size: 11px; gap: 16px; flex-shrink: 0; }
+        .status-item { display: flex; align-items: center; gap: 6px; }
+        .status-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .status-badge.offline { background: var(--red); }
+        .status-value { color: var(--text-secondary); }
+        .regime-label { padding: 2px 6px; border-radius: 2px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .regime-risk-on { background: rgba(63,185,80,0.2); color: var(--green); }
+        .regime-risk-off { background: rgba(248,81,73,0.2); color: var(--red); }
+        .regime-choppy { background: rgba(210,153,34,0.2); color: var(--yellow); }
 
         /* Main Layout */
-        .main-content {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 50px; background: var(--bg-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; overflow-y: auto; overflow-x: hidden; }
+        .sidebar-tab { width: 44px; height: 44px; border: 1px solid transparent; background: transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 2px; transition: all 0.2s ease; font-size: 20px; position: relative; }
+        .sidebar-tab:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .sidebar-tab.active { background: var(--bg-tertiary); color: var(--blue); border-color: var(--blue); }
+        .sidebar-tab .tooltip { position: absolute; left: 52px; background: var(--bg-tertiary); color: var(--text-primary); padding: 4px 8px; border-radius: 2px; font-size: 10px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; border: 1px solid var(--border); z-index: 100; }
+        .sidebar-tab:hover .tooltip { opacity: 1; }
 
-        /* Sidebar Navigation */
-        .sidebar {
-            width: 50px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 8px 0;
-            gap: 4px;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }
-
-        .sidebar-tab {
-            width: 44px;
-            height: 44px;
-            border: 1px solid transparent;
-            background: transparent;
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 2px;
-            transition: all 0.2s ease;
-            font-size: 20px;
-            position: relative;
-        }
-
-        .sidebar-tab:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .sidebar-tab.active {
-            background: var(--bg-tertiary);
-            color: var(--blue);
-            border-color: var(--blue);
-        }
-
-        .sidebar-tab .tooltip {
-            position: absolute;
-            left: 52px;
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 2px;
-            font-size: 10px;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            border: 1px solid var(--border);
-        }
-
-        .sidebar-tab:hover .tooltip {
-            opacity: 1;
-        }
-
-        /* Views Container */
-        .views-container {
-            flex: 1;
-            overflow: hidden;
-            display: flex;
-        }
-
-        .view {
-            display: none;
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            flex-direction: column;
-        }
-
-        .view.active {
-            display: flex;
-        }
-
-        /* Content Padding */
-        .view > * {
-            padding: 0 12px;
-        }
-
-        .view > *:first-child {
-            padding-top: 12px;
-        }
-
-        .view > *:last-child {
-            padding-bottom: 12px;
-        }
+        /* Views */
+        .views-container { flex: 1; overflow: hidden; display: flex; }
+        .view { display: none; flex: 1; overflow-y: auto; overflow-x: hidden; flex-direction: column; }
+        .view.active { display: flex; }
+        .view > * { padding: 0 12px; }
+        .view > *:first-child { padding-top: 12px; }
+        .view > *:last-child { padding-bottom: 24px; }
 
         /* Typography */
-        h1 {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            margin-top: 12px;
-        }
+        h1 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; margin-top: 12px; }
+        h2 { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; margin-top: 14px; }
+        p { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
 
-        h2 {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            margin-top: 10px;
-        }
+        /* Cards */
+        .cards-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .card { background: var(--bg-secondary); border: 1px solid var(--border); padding: 8px 10px; border-radius: 2px; }
+        .card-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card-value { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .card-change { font-size: 10px; }
+        .card-change.positive { color: var(--green); }
+        .card-change.negative { color: var(--red); }
 
-        p {
-            font-size: 11px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        /* Cards Row */
-        .cards-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 8px 10px;
-            border-radius: 2px;
-        }
-
-        .card-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .card-value {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 2px;
-        }
-
-        .card-change {
-            font-size: 10px;
-        }
-
-        .card-change.positive {
-            color: var(--green);
-        }
-
-        .card-change.negative {
-            color: var(--red);
-        }
-
-        /* Reconciliation Banner */
-        .reconciliation-banner {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 6px 10px;
-            margin-bottom: 12px;
-            border-radius: 2px;
-            font-size: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .reconciliation-banner.fail {
-            border-color: var(--red);
-            background: rgba(248, 81, 73, 0.1);
-        }
-
-        .reconciliation-banner.fail .status-text {
-            color: var(--red);
-            font-weight: 600;
-        }
-
-        .reconciliation-parts {
-            display: flex;
-            gap: 12px;
-            flex: 1;
-        }
-
-        .reconciliation-part {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .reconciliation-part-label {
-            color: var(--text-muted);
-            font-size: 9px;
-            text-transform: uppercase;
-        }
-
-        .reconciliation-part-value {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
+        /* Reconciliation */
+        .reconciliation-banner { background: var(--bg-secondary); border: 1px solid var(--border); padding: 6px 10px; margin-bottom: 12px; border-radius: 2px; font-size: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .reconciliation-banner.fail { border-color: var(--red); background: rgba(248,81,73,0.1); }
+        .reconciliation-banner.fail .status-text { color: var(--red); font-weight: 600; }
+        .reconciliation-banner.pass { border-color: var(--green); }
+        .reconciliation-banner.pass .status-text { color: var(--green); font-weight: 600; }
+        .reconciliation-parts { display: flex; gap: 12px; flex: 1; flex-wrap: wrap; }
+        .reconciliation-part { display: flex; flex-direction: column; gap: 2px; }
+        .reconciliation-part-label { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+        .reconciliation-part-value { font-weight: 600; color: var(--text-primary); }
 
         /* Tables */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-            margin-bottom: 12px;
-        }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
+        thead { background: var(--bg-secondary); position: sticky; top: 0; z-index: 10; }
+        th { padding: 6px 8px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 10px; white-space: nowrap; }
+        th:last-child { border-right: none; }
+        td { padding: 6px 8px; border-bottom: 1px solid var(--bg-tertiary); border-right: 1px solid var(--bg-tertiary); font-size: 10px; }
+        td:last-child { border-right: none; }
+        tbody tr:hover { background: var(--bg-tertiary); }
+        th.num, td.num { text-align: right; font-weight: 500; }
 
-        thead {
-            background: var(--bg-secondary);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        th {
-            padding: 6px 8px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--text-secondary);
-            border-bottom: 1px solid var(--border);
-            border-right: 1px solid var(--border);
-            font-size: 10px;
-            white-space: nowrap;
-        }
-
-        th:last-child {
-            border-right: none;
-        }
-
-        td {
-            padding: 6px 8px;
-            border-bottom: 1px solid var(--bg-tertiary);
-            border-right: 1px solid var(--bg-tertiary);
-        }
-
-        td:last-child {
-            border-right: none;
-        }
-
-        tbody tr:hover {
-            background: var(--bg-tertiary);
-        }
-
-        /* Text alignment */
-        th.num, td.num {
-            text-align: right;
-            font-weight: 500;
-        }
-
-        /* Colors */
-        .text-positive {
-            color: var(--green);
-        }
-
-        .text-negative {
-            color: var(--red);
-        }
-
-        .text-neutral {
-            color: var(--text-secondary);
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 4px;
-            border-radius: 2px;
-            font-size: 9px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge-bullish {
-            background: rgba(63, 185, 80, 0.2);
-            color: var(--green);
-        }
-
-        .badge-bearish {
-            background: rgba(248, 81, 73, 0.2);
-            color: var(--red);
-        }
-
-        .badge-neutral {
-            background: rgba(139, 148, 158, 0.2);
-            color: var(--text-secondary);
-        }
-
-        .badge-severe {
-            background: rgba(248, 81, 73, 0.2);
-            color: var(--red);
-        }
-
-        .badge-elevated {
-            background: rgba(240, 136, 62, 0.2);
-            color: var(--orange);
-        }
-
-        .badge-manageable {
-            background: rgba(63, 185, 80, 0.2);
-            color: var(--green);
-        }
+        /* Colors & Badges */
+        .text-positive { color: var(--green); }
+        .text-negative { color: var(--red); }
+        .text-neutral { color: var(--text-secondary); }
+        .badge { display: inline-block; padding: 2px 4px; border-radius: 2px; font-size: 9px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
+        .badge-bullish, .badge-manageable { background: rgba(63,185,80,0.2); color: var(--green); }
+        .badge-bearish, .badge-severe { background: rgba(248,81,73,0.2); color: var(--red); }
+        .badge-neutral { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+        .badge-elevated, .badge-warning { background: rgba(240,136,62,0.2); color: var(--orange); }
+        .badge-purple { background: rgba(137,87,229,0.2); color: var(--purple); }
+        .badge-blue { background: rgba(88,166,255,0.2); color: var(--blue); }
 
         /* Buttons */
-        button {
-            background: var(--blue);
-            color: var(--bg-primary);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 2px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        button:hover {
-            background: #79c0ff;
-        }
-
-        button:active {
-            opacity: 0.8;
-        }
-
-        button.loading {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        /* Donut Chart */
-        .chart-container {
-            display: flex;
-            justify-content: center;
-            margin: 12px 0;
-        }
-
-        .donut-svg {
-            max-width: 300px;
-            height: auto;
-        }
+        button { background: var(--blue); color: var(--bg-primary); border: none; padding: 6px 12px; border-radius: 2px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 0.5px; }
+        button:hover { background: #79c0ff; }
+        button.loading { opacity: 0.6; cursor: not-allowed; }
 
         /* Grid Layouts */
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 
-        .grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        /* Indicators Panel */
-        .indicators-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 8px 10px;
-            border-radius: 2px;
-            margin-bottom: 12px;
-        }
-
-        .indicator-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 4px 0;
-            border-bottom: 1px solid var(--bg-tertiary);
-            font-size: 10px;
-        }
-
-        .indicator-item:last-child {
-            border-bottom: none;
-        }
-
-        .indicator-name {
-            color: var(--text-secondary);
-        }
-
-        .indicator-value {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
+        /* Indicators */
+        .indicators-panel { background: var(--bg-secondary); border: 1px solid var(--border); padding: 8px 10px; border-radius: 2px; margin-bottom: 12px; }
+        .indicator-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--bg-tertiary); font-size: 10px; }
+        .indicator-item:last-child { border-bottom: none; }
+        .indicator-name { color: var(--text-secondary); }
+        .indicator-value { font-weight: 600; color: var(--text-primary); }
 
         /* AI Briefing */
-        .briefing-panel {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 10px;
-            border-radius: 2px;
-            margin-bottom: 12px;
-        }
-
-        .briefing-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .briefing-headline {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-        }
-
-        .briefing-section {
-            padding: 6px 0;
-            border-bottom: 1px solid var(--bg-tertiary);
-            font-size: 10px;
-        }
-
-        .briefing-section:last-child {
-            border-bottom: none;
-        }
-
-        .briefing-section-title {
-            font-weight: 600;
-            color: var(--blue);
-            margin-bottom: 2px;
-        }
-
-        .briefing-section-body {
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--bg-tertiary);
-            border-radius: 2px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--border);
-        }
-
-        /* Flex Utils */
-        .spacer {
-            flex: 1;
-        }
+        .briefing-panel { background: var(--bg-secondary); border: 1px solid var(--border); padding: 10px; border-radius: 2px; margin-bottom: 12px; }
+        .briefing-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .briefing-headline { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .briefing-section { padding: 6px 0; border-bottom: 1px solid var(--bg-tertiary); font-size: 10px; }
+        .briefing-section:last-child { border-bottom: none; }
+        .briefing-section-title { font-weight: 600; color: var(--blue); margin-bottom: 2px; }
+        .briefing-section-body { color: var(--text-secondary); line-height: 1.4; }
 
         /* Mini Stat */
-        .mini-stat {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            font-size: 10px;
-            border-bottom: 1px solid var(--bg-tertiary);
-        }
+        .mini-stat { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; border-bottom: 1px solid var(--bg-tertiary); }
+        .mini-stat:last-child { border-bottom: none; }
+        .mini-stat-label { color: var(--text-muted); }
+        .mini-stat-value { font-weight: 600; color: var(--text-primary); }
 
-        .mini-stat:last-child {
-            border-bottom: none;
-        }
+        /* Chart */
+        .chart-container { display: flex; justify-content: center; margin: 12px 0; }
+        .donut-svg { max-width: 300px; height: auto; }
 
-        .mini-stat-label {
-            color: var(--text-muted);
-        }
+        /* Catalyst card */
+        .catalyst-card { background: var(--bg-secondary); border: 1px solid var(--border); padding: 8px 10px; border-radius: 2px; margin-bottom: 8px; }
+        .catalyst-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .catalyst-event { font-weight: 600; font-size: 11px; color: var(--text-primary); }
+        .catalyst-timing { font-size: 9px; color: var(--text-muted); }
+        .catalyst-body { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
 
-        .mini-stat-value {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+        .spacer { flex: 1; }
     </style>
 </head>
 <body>
@@ -582,12 +156,15 @@
                 <span class="status-value" id="timestamp">--:--:--</span>
             </div>
             <div class="status-item">
-                <span>BASE CURRENCY:</span>
+                <span>BASE:</span>
                 <span class="status-value">A$</span>
             </div>
             <div class="status-item">
                 <span>DATA:</span>
                 <span class="status-value" id="dataStatus">--</span>
+            </div>
+            <div class="status-item">
+                <span id="regimeLabel" class="regime-label regime-choppy">--</span>
             </div>
             <div class="spacer"></div>
             <button id="refreshBtn" style="margin-right: 8px;">REFRESH PRICES</button>
@@ -613,6 +190,10 @@
                     <span class="material-symbols-outlined">public</span>
                     <div class="tooltip">Macro</div>
                 </button>
+                <button class="sidebar-tab" data-view="benchmark">
+                    <span class="material-symbols-outlined">leaderboard</span>
+                    <div class="tooltip">Benchmark</div>
+                </button>
                 <button class="sidebar-tab" data-view="playbook">
                     <span class="material-symbols-outlined">assignment</span>
                     <div class="tooltip">Playbook</div>
@@ -621,1060 +202,689 @@
 
             <!-- Views Container -->
             <div class="views-container">
-                <!-- PORTFOLIO VIEW -->
+
+                <!-- ========== PORTFOLIO VIEW ========== -->
                 <div class="view active" data-view="portfolio" id="portfolioView">
                     <h1>PORTFOLIO OVERVIEW</h1>
-
-                    <div class="cards-row">
-                        <div class="card">
-                            <div class="card-label">Total Value</div>
-                            <div class="card-value" id="totalValue">A$ --</div>
-                        </div>
-                        <div class="card">
-                            <div class="card-label">Day P&L</div>
-                            <div class="card-value" id="dayPnl">A$ --</div>
-                            <div class="card-change" id="dayPnlPct">-- %</div>
-                        </div>
-                        <div class="card">
-                            <div class="card-label">Total Return</div>
-                            <div class="card-value" id="totalReturn">A$ --</div>
-                            <div class="card-change" id="totalReturnPct">-- %</div>
-                        </div>
-                        <div class="card">
-                            <div class="card-label">Invested Capital</div>
-                            <div class="card-value">A$ 26,333.92</div>
-                        </div>
-                    </div>
-
+                    <div class="cards-row" id="portfolioCards"></div>
                     <div id="reconciliationBanner"></div>
-
                     <h2>HOLDINGS</h2>
+                    <div style="overflow-x: auto;">
                     <table id="holdingsTable">
-                        <thead>
-                            <tr>
-                                <th>Ticker</th>
-                                <th>Name</th>
-                                <th>Class</th>
-                                <th class="num">Shares</th>
-                                <th class="num">Avg Cost</th>
-                                <th class="num">Price</th>
-                                <th class="num">Mkt Value A$</th>
-                                <th class="num">Weight %</th>
-                                <th class="num">Day P&L A$</th>
-                                <th class="num">Total P&L A$</th>
-                                <th class="num">Return %</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="holdingsBody">
-                            <!-- Populated by JS -->
-                        </tbody>
+                        <thead><tr>
+                            <th>Ticker</th><th>Name</th><th>Class</th><th>Theme</th>
+                            <th class="num">Shares</th><th class="num">Avg Cost</th><th class="num">Price</th>
+                            <th class="num">Mkt Val A$</th><th class="num">Wt %</th>
+                            <th class="num">Day P&L</th><th class="num">Total P&L</th><th class="num">Ret %</th>
+                            <th class="num">vs 50D</th><th class="num">1M ROC</th><th class="num">RSI</th><th class="num">vs 52W Hi</th>
+                            <th>Status</th><th class="num">Target</th><th class="num">Drift</th><th>Action</th>
+                        </tr></thead>
+                        <tbody id="holdingsBody"></tbody>
                     </table>
-
+                    </div>
                     <h2>ALLOCATION</h2>
                     <div class="chart-container">
-                        <svg id="allocationChart" class="donut-svg" width="300" height="320" viewBox="0 0 300 320">
-                            <!-- Populated by JS -->
-                        </svg>
+                        <svg id="allocationChart" class="donut-svg" width="300" height="340" viewBox="0 0 300 340"></svg>
                     </div>
                 </div>
 
-                <!-- RISK VIEW -->
+                <!-- ========== RISK VIEW ========== -->
                 <div class="view" data-view="risk" id="riskView">
                     <h1>RISK ANALYSIS</h1>
-
                     <h2>CONCENTRATION METRICS</h2>
-                    <table id="riskTable">
-                        <thead>
-                            <tr>
-                                <th>Metric</th>
-                                <th class="num">Value</th>
-                                <th>Severity</th>
-                                <th>Interpretation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="riskBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <table><thead><tr><th>Metric</th><th class="num">Value</th><th>Severity</th><th>Interpretation</th></tr></thead><tbody id="riskBody"></tbody></table>
 
-                    <h2>CURRENT vs TARGET ALLOCATION</h2>
-                    <table id="allocationTable">
-                        <thead>
-                            <tr>
-                                <th>Bucket</th>
-                                <th class="num">Current %</th>
-                                <th class="num">Target %</th>
-                                <th class="num">Drift %</th>
-                                <th class="num">A$ to Add/Trim</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="allocationBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <h2>CURRENT vs TARGET ALLOCATION (BUCKET)</h2>
+                    <table><thead><tr><th>Bucket</th><th class="num">Current %</th><th class="num">Target %</th><th class="num">Drift %</th><th class="num">A$ to Add/Trim</th><th>Action</th><th>Why</th></tr></thead><tbody id="allocationBucketBody"></tbody></table>
+
+                    <h2>POSITION-LEVEL DRIFT</h2>
+                    <table><thead><tr><th>Ticker</th><th class="num">Current %</th><th class="num">Target %</th><th class="num">Drift %</th><th class="num">A$ to Add/Trim</th><th>Action</th></tr></thead><tbody id="positionDriftBody"></tbody></table>
 
                     <h2>PORTFOLIO CHARACTERIZATION</h2>
-                    <div class="card">
-                        <p id="characterization"></p>
-                    </div>
+                    <div class="card"><p id="characterization"></p></div>
                 </div>
 
-                <!-- ATTRIBUTION VIEW -->
+                <!-- ========== ATTRIBUTION VIEW ========== -->
                 <div class="view" data-view="attribution" id="attributionView">
                     <h1>ATTRIBUTION ANALYSIS</h1>
-
                     <h2>WHY MY PORTFOLIO MOVED</h2>
-                    <div class="card">
-                        <ul id="whyMovedList" style="margin-left: 16px; font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
-                            <!-- Populated by JS -->
-                        </ul>
-                    </div>
+                    <div class="card"><ul id="whyMovedList" style="margin-left: 16px; font-size: 11px; color: var(--text-secondary); line-height: 1.6;"></ul></div>
 
                     <h2>CONTRIBUTION BY HOLDING</h2>
-                    <table id="contributionTable">
-                        <thead>
-                            <tr>
-                                <th>Ticker</th>
-                                <th class="num">Weight %</th>
-                                <th class="num">Day P&L A$</th>
-                                <th class="num">Day Contrib %</th>
-                                <th class="num">Total P&L A$</th>
-                                <th>Status</th>
-                                <th>Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody id="contributionBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <table><thead><tr><th>Ticker</th><th class="num">Wt %</th><th class="num">Day P&L A$</th><th class="num">Day Contrib</th><th class="num">Since Inception P&L</th><th class="num">SI Return %</th><th>Status</th><th>Comment</th></tr></thead><tbody id="contributionBody"></tbody></table>
 
                     <h2>ATTRIBUTION BY ASSET CLASS</h2>
-                    <table id="classAttributionTable">
-                        <thead>
-                            <tr>
-                                <th>Asset Class</th>
-                                <th class="num">Weight %</th>
-                                <th class="num">Day P&L A$</th>
-                                <th class="num">Total P&L A$</th>
-                                <th>Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody id="classAttributionBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <table><thead><tr><th>Asset Class</th><th class="num">Weight %</th><th class="num">Day P&L A$</th><th class="num">Total P&L A$</th><th>Comment</th></tr></thead><tbody id="classAttributionBody"></tbody></table>
+
+                    <h2>ATTRIBUTION BY THEME</h2>
+                    <table><thead><tr><th>Theme</th><th class="num">Weight %</th><th class="num">Day P&L A$</th><th class="num">Total P&L A$</th><th>Comment</th></tr></thead><tbody id="themeAttributionBody"></tbody></table>
+
+                    <h2>FX ATTRIBUTION</h2>
+                    <div class="card" id="fxAttributionCard"><p>Calculating...</p></div>
                 </div>
 
-                <!-- MACRO VIEW -->
+                <!-- ========== MACRO VIEW ========== -->
                 <div class="view" data-view="macro" id="macroView">
                     <h1>MACRO OVERLAY</h1>
-
                     <div class="grid-2">
                         <div>
                             <h2>KEY INDICATORS</h2>
-                            <div class="indicators-panel" id="indicatorsPanel">
-                                <div class="indicator-item">
-                                    <span class="indicator-name">Fed Funds</span>
-                                    <span class="indicator-value" id="ind-fedfunds">--</span>
-                                </div>
-                                <div class="indicator-item">
-                                    <span class="indicator-name">CPI (YoY)</span>
-                                    <span class="indicator-value" id="ind-cpi">--</span>
-                                </div>
-                                <div class="indicator-item">
-                                    <span class="indicator-name">10Y Yield</span>
-                                    <span class="indicator-value" id="ind-10y">--</span>
-                                </div>
-                                <div class="indicator-item">
-                                    <span class="indicator-name">2Y Yield</span>
-                                    <span class="indicator-value" id="ind-2y">--</span>
-                                </div>
-                                <div class="indicator-item">
-                                    <span class="indicator-name">DXY</span>
-                                    <span class="indicator-value" id="ind-dxy">--</span>
-                                </div>
-                                <div class="indicator-item">
-                                    <span class="indicator-name">VIX</span>
-                                    <span class="indicator-value" id="ind-vix">--</span>
-                                </div>
+                            <div class="indicators-panel">
+                                <div class="indicator-item"><span class="indicator-name">S&P 500</span><span class="indicator-value" id="ind-sp500">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">NASDAQ</span><span class="indicator-value" id="ind-nasdaq">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">VIX</span><span class="indicator-value" id="ind-vix">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">10Y Yield</span><span class="indicator-value" id="ind-10y">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">2Y Yield</span><span class="indicator-value" id="ind-2y">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">DXY</span><span class="indicator-value" id="ind-dxy">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">Gold (GLD)</span><span class="indicator-value" id="ind-gld">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">TLT (20Y Bond)</span><span class="indicator-value" id="ind-tlt">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">BTC (A$)</span><span class="indicator-value" id="ind-btc">--</span></div>
+                                <div class="indicator-item"><span class="indicator-name">AUD/USD</span><span class="indicator-value" id="ind-audusd">--</span></div>
                             </div>
-
-                            <h2>YIELD CURVE</h2>
-                            <svg id="yieldCurve" width="100%" height="200" viewBox="0 0 400 200" style="border: 1px solid var(--border); margin-bottom: 12px;">
-                                <!-- Populated by JS -->
-                            </svg>
                         </div>
-
                         <div>
                             <h2>AI BRIEFING</h2>
                             <div class="briefing-panel">
-                                <div class="briefing-header">
-                                    <span>Market Intelligence</span>
-                                    <button id="generateMacroBtn">GENERATE</button>
-                                </div>
-                                <div id="briefingContent" style="font-size: 10px; color: var(--text-secondary);">
-                                    Click "Generate" to fetch AI briefing...
-                                </div>
-                            </div>
-
-                            <h2>MACRO MAPPING</h2>
-                            <div class="card">
-                                <div class="mini-stat">
-                                    <span class="mini-stat-label">DXY → BTC, SOL, EM</span>
-                                    <span class="mini-stat-value">↓ Rates = ↑ Risk Assets</span>
-                                </div>
-                                <div class="mini-stat">
-                                    <span class="mini-stat-label">2Y/10Y Spread</span>
-                                    <span class="mini-stat-value">↑ Growth / ↓ Duration</span>
-                                </div>
-                                <div class="mini-stat">
-                                    <span class="mini-stat-label">Fed Hikes → VIX</span>
-                                    <span class="mini-stat-value">↑ Volatility Risk</span>
-                                </div>
-                                <div class="mini-stat">
-                                    <span class="mini-stat-label">CPI → Tech Valuations</span>
-                                    <span class="mini-stat-value">↑ Inflation = ↓ Multiples</span>
-                                </div>
-                                <div class="mini-stat">
-                                    <span class="mini-stat-label">VIX → Crypto Leverage</span>
-                                    <span class="mini-stat-value">↑ Vol = Risk-off flows</span>
-                                </div>
+                                <div class="briefing-header"><span>Market Intelligence</span><button id="generateMacroBtn">GENERATE</button></div>
+                                <div id="briefingContent" style="font-size: 10px; color: var(--text-secondary);">Click "Generate" to fetch AI briefing...</div>
                             </div>
                         </div>
                     </div>
+                    <h2>PERSONALIZED MACRO MAPPING</h2>
+                    <table><thead><tr><th>Macro Driver</th><th>Current</th><th>Signal</th><th>My Exposed Holdings</th><th>Portfolio Impact</th></tr></thead><tbody id="macroMappingBody"></tbody></table>
                 </div>
 
-                <!-- PLAYBOOK VIEW -->
+                <!-- ========== BENCHMARK VIEW ========== -->
+                <div class="view" data-view="benchmark" id="benchmarkView">
+                    <h1>BENCHMARKS & RELATIVE PERFORMANCE</h1>
+                    <h2>BLENDED BENCHMARK</h2>
+                    <div class="card" id="blendedBenchmarkCard"><p>Loading...</p></div>
+                    <h2>SLEEVE vs BENCHMARK</h2>
+                    <table><thead><tr><th>Sleeve</th><th>Benchmark</th><th class="num">Portfolio %</th><th class="num">Benchmark %</th><th class="num">Alpha</th><th>Interpretation</th></tr></thead><tbody id="sleeveBenchmarkBody"></tbody></table>
+                    <h2>PERFORMANCE ATTRIBUTION</h2>
+                    <div class="card" id="performanceAttribution"><p>Loading...</p></div>
+                </div>
+
+                <!-- ========== PLAYBOOK VIEW ========== -->
                 <div class="view" data-view="playbook" id="playbookView">
                     <h1>ACTION PLAYBOOK</h1>
-
                     <h2>ACTION QUEUE</h2>
-                    <table id="actionQueueTable">
-                        <thead>
-                            <tr>
-                                <th>Priority</th>
-                                <th>Ticker/Bucket</th>
-                                <th>Action</th>
-                                <th class="num">A$ Size</th>
-                                <th>Funding Source</th>
-                                <th>Rationale</th>
-                                <th>Risk</th>
-                            </tr>
-                        </thead>
-                        <tbody id="actionQueueBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <table><thead><tr><th>Priority</th><th>Ticker/Bucket</th><th>Action</th><th class="num">A$ Size</th><th>Funding Source</th><th>Rationale</th><th>Risk</th></tr></thead><tbody id="actionQueueBody"></tbody></table>
 
-                    <h2>CONVICTION & THESIS</h2>
-                    <table id="thesisTable">
-                        <thead>
-                            <tr>
-                                <th>Ticker</th>
-                                <th>Thesis</th>
-                                <th>Status</th>
-                                <th>Add On</th>
-                                <th>Trim On</th>
-                                <th>Invalidation</th>
-                                <th>Next Catalyst</th>
-                            </tr>
-                        </thead>
-                        <tbody id="thesisBody">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                    <h2>CONVICTION & THESIS MONITOR</h2>
+                    <table><thead><tr><th>Ticker</th><th>Thesis</th><th>Status</th><th>Add On</th><th>Trim On</th><th>Invalidation</th><th>Next Catalyst</th></tr></thead><tbody id="thesisBody"></tbody></table>
+
+                    <h2>NEXT CATALYSTS</h2>
+                    <div id="catalystCards"></div>
                 </div>
+
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== CONFIG ====================
-        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+    // ==================== CONFIG ====================
+    const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost') ? 'http://localhost:3001' : '';
 
-        const PORTFOLIO_HOLDINGS = [
-            { ticker: 'SOL', name: 'Solana', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 48.77, avgCost: 210.6974, costBasis: 10274.29, fees: 61.76, firstBuy: '2024-01-05', lastTrade: '2026-10-02', yf: 'SOL-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
-            { ticker: 'ETH', name: 'Ethereum', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 1.71, avgCost: 3756.0234, costBasis: 6422.80, fees: 34.77, firstBuy: '2024-01-11', lastTrade: '2026-10-02', yf: 'ETH-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
-            { ticker: 'AMZN', name: 'Amazon.com', assetClass: 'US Equities', theme: 'Mega-Cap Tech', shares: 16, avgCost: 292.7125, costBasis: 4683.40, fees: 0, firstBuy: '2026-02-12', lastTrade: '2026-02-12', yf: 'AMZN', currency: 'USD', positionType: 'core', conviction: 'high' },
-            { ticker: 'DOGE', name: 'Dogecoin', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 15385.71, avgCost: 0.18886, costBasis: 2905.85, fees: 10.96, firstBuy: '2024-07-08', lastTrade: '2026-10-02', yf: 'DOGE-AUD', currency: 'AUD', positionType: 'speculative', conviction: 'low' },
-            { ticker: 'SUI', name: 'Sui', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 335.72, avgCost: 4.9828, costBasis: 1672.98, fees: 9.88, firstBuy: '2024-12-30', lastTrade: '2025-10-22', yf: 'SUI20947-USD', currency: 'USD', positionType: 'satellite', conviction: 'medium' },
-            { ticker: 'PENGU', name: 'Pudgy Penguins', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 0.875, avgCost: 428.1177, costBasis: 374.60, fees: 3.13, firstBuy: '2025-07-17', lastTrade: '2025-12-15', yf: 'PENGU28905-USD', currency: 'USD', positionType: 'speculative', conviction: 'low' },
-        ];
+    const PORTFOLIO_HOLDINGS = [
+        { ticker: 'SOL', name: 'Solana', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 48.77, avgCost: 210.6974, costBasis: 10274.29, fees: 61.76, firstBuy: '2024-01-05', yf: 'SOL-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
+        { ticker: 'ETH', name: 'Ethereum', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 1.71, avgCost: 3756.0234, costBasis: 6422.80, fees: 34.77, firstBuy: '2024-01-11', yf: 'ETH-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
+        { ticker: 'AMZN', name: 'Amazon.com', assetClass: 'US Equities', theme: 'Mega-Cap Tech', shares: 16, avgCost: 292.7125, costBasis: 4683.40, fees: 0, firstBuy: '2026-02-12', yf: 'AMZN', currency: 'USD', positionType: 'core', conviction: 'high' },
+        { ticker: 'DOGE', name: 'Dogecoin', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 15385.71, avgCost: 0.18886, costBasis: 2905.85, fees: 10.96, firstBuy: '2024-07-08', yf: 'DOGE-AUD', currency: 'AUD', positionType: 'speculative', conviction: 'low' },
+        { ticker: 'SUI', name: 'Sui', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 335.72, avgCost: 4.9828, costBasis: 1672.98, fees: 9.88, firstBuy: '2024-12-30', yf: 'SUI20947-USD', currency: 'USD', positionType: 'satellite', conviction: 'medium' },
+        { ticker: 'PENGU', name: 'Pudgy Penguins', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 0.875, avgCost: 428.1177, costBasis: 374.60, fees: 3.13, firstBuy: '2025-07-17', yf: 'PENGU28905-USD', currency: 'USD', positionType: 'speculative', conviction: 'low' },
+    ];
 
-        const TOTAL_INVESTED = 26333.92;
-        const TOTAL_FEES = 125.50;
-        const REALIZED_PNL = -644.92;
+    const TOTAL_COST_BASIS = 26333.92;
+    const TOTAL_FEES = 125.50;
+    const REALIZED_PNL = -644.92;
+    const CASH_BALANCE = 0;
 
-        // Target allocation model
-        const TARGET_ALLOCATION = {
-            'Core Crypto': { holdings: ['SOL', 'ETH'], target: 0.40 },
-            'US Equities': { holdings: ['AMZN'], target: 0.25 },
-            'Speculative Crypto': { holdings: ['DOGE', 'SUI', 'PENGU'], target: 0.10 },
-            'Cash / Reserve': { target: 0.25 }
-        };
+    // ASSUMED TARGET MODEL
+    const TARGET_ALLOCATION_BUCKETS = {
+        'Core Crypto (SOL/ETH)': { holdings: ['SOL', 'ETH'], target: 0.40, benchmark: 'BTC-AUD' },
+        'US Equities (AMZN)':    { holdings: ['AMZN'], target: 0.25, benchmark: '^GSPC' },
+        'Satellite (SUI)':       { holdings: ['SUI'], target: 0.10, benchmark: 'SOL-AUD' },
+        'Speculative (DOGE/PENGU)': { holdings: ['DOGE', 'PENGU'], target: 0.05, benchmark: 'DOGE-AUD' },
+        'Cash / Reserve':        { holdings: [], target: 0.20, benchmark: 'SHV' },
+    };
 
-        // ==================== STATE ====================
-        let portfolioState = {
-            prices: {}, // { symbol: price }
-            changes: {}, // { symbol: dayChange % }
-            audusd: 1.0,
-            isLive: false,
-            lastUpdate: null,
-            holdings: PORTFOLIO_HOLDINGS.map(h => ({ ...h }))
-        };
+    const POSITION_TARGETS = { SOL: 0.25, ETH: 0.15, AMZN: 0.25, DOGE: 0.03, SUI: 0.10, PENGU: 0.02 };
 
-        // ==================== DOM CACHE ====================
-        const dom = {
-            statusBadge: document.getElementById('statusBadge'),
-            statusText: document.getElementById('statusText'),
-            timestamp: document.getElementById('timestamp'),
-            dataStatus: document.getElementById('dataStatus'),
-            refreshBtn: document.getElementById('refreshBtn'),
-            reconciliationBanner: document.getElementById('reconciliationBanner'),
-            totalValue: document.getElementById('totalValue'),
-            dayPnl: document.getElementById('dayPnl'),
-            dayPnlPct: document.getElementById('dayPnlPct'),
-            totalReturn: document.getElementById('totalReturn'),
-            totalReturnPct: document.getElementById('totalReturnPct'),
-            holdingsBody: document.getElementById('holdingsBody'),
-            allocationChart: document.getElementById('allocationChart'),
-            riskBody: document.getElementById('riskBody'),
-            allocationBody: document.getElementById('allocationBody'),
-            characterization: document.getElementById('characterization'),
-            whyMovedList: document.getElementById('whyMovedList'),
-            contributionBody: document.getElementById('contributionBody'),
-            classAttributionBody: document.getElementById('classAttributionBody'),
-            generateMacroBtn: document.getElementById('generateMacroBtn'),
-            briefingContent: document.getElementById('briefingContent'),
-            actionQueueBody: document.getElementById('actionQueueBody'),
-            thesisBody: document.getElementById('thesisBody'),
-            indicatorsPanel: document.getElementById('indicatorsPanel'),
-            yieldCurve: document.getElementById('yieldCurve')
-        };
+    const THESIS_DATA = {
+        SOL:  { thesis: 'L1 infrastructure play; MEV resistance, low fees, DeFi narrative recovery', addOn: 'Break below A$150 with thesis intact', trimOn: 'Break above A$300 or weight > 30%', invalidation: 'Sustained network outages, validator exodus', catalyst: 'Firedancer launch, DeFi TVL recovery' },
+        ETH:  { thesis: 'Blue-chip smart contract layer; staking yields, rollup ecosystem, institutional adoption', addOn: 'Break below A$2800 with L2 growth intact', trimOn: 'Break above A$5000 or weight > 20%', invalidation: 'Base layer obsolescence, L2 centralization', catalyst: 'ETF flows, protocol upgrades' },
+        AMZN: { thesis: 'Cloud/AI growth; AWS margin expansion, advertising upside, AI infra play', addOn: 'Earnings miss below USD$170 with AWS intact', trimOn: 'Multiple >40x, AI capex doubts', invalidation: 'AWS share loss to MSFT/GOOG below 30%', catalyst: 'Quarterly earnings, AWS AI adoption' },
+        DOGE: { thesis: 'Meme momentum, community/retail speculation, low conviction trade', addOn: 'Do not add', trimOn: 'Any 20%+ rally from current levels', invalidation: 'Loss of cultural relevance', catalyst: 'None reliable' },
+        SUI:  { thesis: 'Move-based execution layer; throughput, validator APY, ecosystem growth', addOn: 'Ecosystem adoption in on-chain metrics', trimOn: 'Break above USD$8; 100%+ gain', invalidation: 'Aptos dominance, SUI loses dev mindshare', catalyst: 'Major dApp launch, TVL milestones' },
+        PENGU: { thesis: 'NFT/IP speculation; zero fundamental support', addOn: 'Do not add', trimOn: 'Exit all immediately', invalidation: 'Already invalidated — dead money', catalyst: 'None' },
+    };
 
-        // ==================== UTILITY FUNCTIONS ====================
-        function formatCurrency(num, decimals = 2) {
-            if (num === null || num === undefined) return 'A$ --';
-            return 'A$ ' + num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
+    const CATALYSTS = [
+        { event: 'FOMC Rate Decision', timing: 'May 6-7, 2026', holdings: ['All — rate sensitivity'], bullish: 'Dovish hold or cut signal — risk-on, crypto + growth rally', bearish: 'Hawkish surprise — USD strength, duration selloff, crypto down' },
+        { event: 'AMZN Q1 Earnings', timing: 'Late April 2026', holdings: ['AMZN'], bullish: 'AWS growth >15%, AI revenue acceleration', bearish: 'Margin compression, capex overshoot, guidance miss' },
+        { event: 'US CPI Release', timing: 'May 13, 2026', holdings: ['All — inflation-sensitive'], bullish: 'Below 2.5% — rate cut narrative, risk-on', bearish: 'Above 3% — hawkish repricing, USD up, crypto down' },
+        { event: 'Bitcoin Halving Cycle Momentum', timing: 'Ongoing 2026', holdings: ['SOL', 'ETH', 'DOGE', 'SUI', 'PENGU'], bullish: 'Post-halving supply shock + institutional demand', bearish: 'Miner capitulation, regulatory crackdown' },
+        { event: 'Ethereum Protocol Upgrades', timing: 'H1 2026', holdings: ['ETH'], bullish: 'Improved throughput, lower L2 fees, staking yield increase', bearish: 'Delay or technical issues erode confidence' },
+    ];
 
-        function formatNumber(num, decimals = 2) {
-            if (num === null || num === undefined) return '--';
-            return num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
+    const MACRO_SYMBOLS = ['^GSPC', '^IXIC', '^VIX', '^TNX', '^FVX', 'DX-Y.NYB', 'GLD', 'TLT', 'HYG', 'BTC-AUD', 'AUDUSD=X'];
 
-        function formatPercent(num, decimals = 1) {
-            if (num === null || num === undefined) return '--';
-            const sign = num >= 0 ? '+' : '';
-            return sign + num.toFixed(decimals) + '%';
-        }
+    // ==================== STATE ====================
+    let S = {
+        prices: {}, changes: {}, extras: {}, technicals: {},
+        macroPrices: {}, macroChanges: {},
+        audusd: 1.0, isLive: false, lastUpdate: null,
+        holdings: PORTFOLIO_HOLDINGS.map(h => ({ ...h })),
+        totalValue: 0, totalDayPnl: 0, totalDayPnlPct: 0,
+        unrealizedPnl: 0, totalReturn: 0, totalReturnPct: 0,
+        reconcileOk: false, reconcileError: 0, regime: 'CHOPPY',
+    };
 
-        function formatPrice(num, decimals = 2) {
-            if (num === null || num === undefined) return '--';
-            return num.toFixed(decimals);
-        }
+    // ==================== UTILITY ====================
+    const fmtC = (n, d=2) => n == null ? 'A$ --' : 'A$ ' + n.toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const fmtN = (n, d=2) => n == null ? '--' : n.toFixed(d).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const fmtP = (n, d=1) => n == null ? '--' : (n >= 0 ? '+' : '') + n.toFixed(d) + '%';
+    const fmtPr = (n, d=2) => n == null ? '--' : n.toFixed(d);
+    const clr = (n) => n >= 0 ? 'text-positive' : 'text-negative';
 
-        function getStatusBadge(priceVsAvg, dayChange) {
-            if (priceVsAvg > 0.15) return { text: 'FROTHY', class: 'badge-bearish' };
-            if (priceVsAvg > 0.05 && dayChange > 2) return { text: 'BULLISH', class: 'badge-bullish' };
-            if (priceVsAvg > 0) return { text: 'BULLISH', class: 'badge-bullish' };
-            if (priceVsAvg < -0.20) return { text: 'DEAD MONEY', class: 'badge-bearish' };
-            if (priceVsAvg < -0.10 && dayChange < -2) return { text: 'BLEEDING', class: 'badge-bearish' };
-            if (priceVsAvg < 0 && dayChange < 0) return { text: 'BLEEDING', class: 'badge-bearish' };
-            if (priceVsAvg < -0.05) return { text: 'OVERSOLD', class: 'badge-neutral' };
+    // ==================== TECHNICAL CLASSIFICATION (SPEC RULES) ====================
+    function classifyTechnical(h) {
+        const rsi = h.rsi, roc = h.roc1m, sma50pct = h.vs50d, vs52hi = h.vs52wHigh;
+        if (rsi == null || roc == null || sma50pct == null || vs52hi == null) {
+            const pctFromAvg = h.priceAUD > 0 ? ((h.priceAUD - h.avgCost) / h.avgCost) : 0;
+            if (pctFromAvg < -0.20) return { text: 'DEAD MONEY', class: 'badge-bearish' };
+            if (pctFromAvg < -0.05) return { text: 'BLEEDING', class: 'badge-bearish' };
+            if (pctFromAvg > 0.05) return { text: 'BULLISH', class: 'badge-bullish' };
             return { text: 'HOLD', class: 'badge-neutral' };
         }
+        if (roc > 10 && sma50pct > 5 && rsi > 70 && vs52hi > -3) return { text: 'ON A TEAR', class: 'badge-purple' };
+        if (rsi > 80 && sma50pct > 8 && vs52hi > -1) return { text: 'FROTHY', class: 'badge-warning' };
+        if (rsi < 30 && sma50pct < -10) return { text: 'OVERSOLD', class: 'badge-bearish' };
+        if (roc < 0 && sma50pct < 0 && vs52hi < -20) return { text: 'DEAD MONEY', class: 'badge-bearish' };
+        if (roc < 0 && sma50pct < 0) return { text: 'BLEEDING', class: 'badge-bearish' };
+        if (sma50pct > 0 && roc > 0) return { text: 'BULLISH', class: 'badge-bullish' };
+        return { text: 'NEUTRAL', class: 'badge-neutral' };
+    }
 
-        function getActionRecommendation(holding, weight, conviction, pnlReturn) {
-            if (holding.ticker === 'PENGU') return 'EXIT';
-            if (holding.ticker === 'DOGE' && conviction === 'low' && pnlReturn < 0) return 'TRIM';
-            if (holding.positionType === 'core') return 'HOLD';
-            if (holding.positionType === 'satellite' && weight > 0.10) return 'TRIM';
-            if (conviction === 'low' && weight > 0.08) return 'TRIM';
-            if (conviction === 'high' && pnlReturn < -0.10) return 'WATCH';
-            return 'HOLD';
+    // ==================== DYNAMIC ACTION LOGIC ====================
+    function computeAction(h) {
+        const status = classifyTechnical(h);
+        const w = h.weight / 100;
+        const target = POSITION_TARGETS[h.ticker] || 0.05;
+        const drift = w - target;
+        if (h.ticker === 'PENGU') return 'EXIT';
+        if (status.text === 'FROTHY' && drift > 0.03) return 'TRIM';
+        if (status.text === 'ON A TEAR' && drift > 0.05) return 'TRIM';
+        if ((status.text === 'DEAD MONEY' || status.text === 'BLEEDING') && h.conviction === 'low') return 'EXIT';
+        if (status.text === 'DEAD MONEY' && h.conviction === 'medium') return 'TRIM';
+        if (drift > 0.10) return 'TRIM';
+        if (drift < -0.05 && (status.text === 'BULLISH' || status.text === 'ON A TEAR') && h.conviction !== 'low') return 'ADD';
+        if (status.text === 'OVERSOLD' && h.conviction === 'high') return 'WATCH';
+        if (h.positionType === 'speculative' && h.conviction === 'low' && w > target + 0.02) return 'TRIM';
+        return 'HOLD';
+    }
+
+    // ==================== REGIME DETECTION ====================
+    function detectRegime() {
+        const mp = S.macroPrices, mc = S.macroChanges;
+        const vix = mp['^VIX'], spChg = mc['^GSPC'], dxyChg = mc['DX-Y.NYB'], hygChg = mc['HYG'];
+        if (vix == null) return 'UNKNOWN';
+        let score = 0;
+        if (vix < 16) score += 2; else if (vix < 20) score += 1; else if (vix > 25) score -= 2; else if (vix > 20) score -= 1;
+        if (spChg != null) { if (spChg > 0.5) score += 1; if (spChg < -0.5) score -= 1; }
+        if (dxyChg != null) { if (dxyChg < -0.3) score += 1; if (dxyChg > 0.3) score -= 1; }
+        if (hygChg != null) { if (hygChg > 0) score += 1; if (hygChg < -0.3) score -= 1; }
+        if (score >= 3) return 'RISK-ON';
+        if (score <= -2) return 'RISK-OFF';
+        return 'CHOPPY';
+    }
+
+    // ==================== DATA FETCHING ====================
+    async function fetchPrices() {
+        try {
+            document.getElementById('refreshBtn').classList.add('loading');
+            document.getElementById('refreshBtn').disabled = true;
+            const holdingSymbols = ['SOL-AUD', 'ETH-AUD', 'DOGE-AUD', 'SUI20947-USD', 'PENGU28905-USD', 'AMZN', 'AUDUSD=X'];
+            const allSymbols = [...new Set([...holdingSymbols, ...MACRO_SYMBOLS])];
+            const techSymbols = holdingSymbols.filter(s => s !== 'AUDUSD=X');
+
+            const response = await fetch(`${API_BASE}/api/prices`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbols: allSymbols, technicals: techSymbols })
+            });
+            if (!response.ok) throw new Error(`Price fetch failed: ${response.status}`);
+            const data = await response.json();
+
+            S.prices = data.prices || {};
+            S.changes = data.changes || {};
+            S.extras = data.extras || {};
+            S.technicals = data.technicals || {};
+            S.audusd = S.prices['AUDUSD=X'] || 0.65;
+
+            MACRO_SYMBOLS.forEach(sym => {
+                if (data.prices[sym] != null) S.macroPrices[sym] = data.prices[sym];
+                if (data.changes[sym] != null) S.macroChanges[sym] = data.changes[sym];
+            });
+
+            S.isLive = Object.keys(S.prices).length > 2;
+            S.lastUpdate = new Date();
+            S.regime = detectRegime();
+            recalculate();
+            renderAll();
+            updateStatusBar();
+        } catch (error) {
+            console.error('Price fetch error:', error);
+            S.isLive = false;
+            updateStatusBar();
+        } finally {
+            document.getElementById('refreshBtn').classList.remove('loading');
+            document.getElementById('refreshBtn').disabled = false;
         }
+    }
 
-        function updateTimestamp() {
-            const now = new Date();
-            const hms = now.toTimeString().slice(0, 8);
-            dom.timestamp.textContent = hms;
-        }
-
-        // ==================== DATA FETCHING ====================
-        async function fetchPrices() {
-            try {
-                dom.refreshBtn.classList.add('loading');
-                dom.refreshBtn.disabled = true;
-
-                const yieldSymbols = ['SOL-AUD', 'ETH-AUD', 'DOGE-AUD', 'SUI20947-USD', 'PENGU28905-USD', 'AMZN', 'AUDUSD=X'];
-
-                const response = await fetch(`${API_BASE}/api/prices`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbols: yieldSymbols })
+    async function fetchMacroBriefing() {
+        try {
+            document.getElementById('generateMacroBtn').classList.add('loading');
+            document.getElementById('generateMacroBtn').disabled = true;
+            const response = await fetch(`${API_BASE}/api/macro`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            if (!response.ok) throw new Error('Macro fetch failed');
+            const data = await response.json();
+            if (data.briefing) {
+                let html = '<div class="briefing-headline">' + (data.briefing.headline || 'Market Brief') + '</div>';
+                (data.briefing.sections || []).forEach(s => {
+                    html += `<div class="briefing-section"><div class="briefing-section-title">${s.label || s.title}</div><div class="briefing-section-body">${s.text || s.body}</div></div>`;
                 });
-
-                if (!response.ok) throw new Error('Price fetch failed');
-
-                const data = await response.json();
-                portfolioState.prices = data.prices || {};
-                portfolioState.changes = data.changes || {};
-                portfolioState.audusd = portfolioState.prices['AUDUSD=X'] || 1.0;
-                portfolioState.isLive = true;
-                portfolioState.lastUpdate = new Date();
-
-                updateStatusBar();
-                recalculatePortfolio();
-                render();
-            } catch (error) {
-                console.error('Price fetch error:', error);
-                portfolioState.isLive = false;
-                updateStatusBar();
-            } finally {
-                dom.refreshBtn.classList.remove('loading');
-                dom.refreshBtn.disabled = false;
+                document.getElementById('briefingContent').innerHTML = html;
             }
+        } catch (error) {
+            document.getElementById('briefingContent').innerHTML = '<span style="color: var(--red);">Error: ' + error.message + '</span>';
+        } finally {
+            document.getElementById('generateMacroBtn').classList.remove('loading');
+            document.getElementById('generateMacroBtn').disabled = false;
         }
+    }
 
-        async function fetchMacroBriefing() {
-            try {
-                dom.generateMacroBtn.classList.add('loading');
-                dom.generateMacroBtn.disabled = true;
+    // ==================== CALCULATIONS ====================
+    function recalculate() {
+        let totalValue = 0, totalDayPnl = 0, totalUnrealizedPnl = 0;
 
-                const response = await fetch(`${API_BASE}/api/macro`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+        S.holdings.forEach(h => {
+            let price = S.prices[h.yf] || 0;
+            const dayChg = S.changes[h.yf] || 0;
+            const ext = S.extras[h.yf] || {};
+            const tech = S.technicals[h.yf] || {};
 
-                if (!response.ok) throw new Error('Macro fetch failed');
+            if (h.currency === 'USD' && S.audusd > 0) price = price / S.audusd;
 
-                const data = await response.json();
+            const mktVal = h.shares * price;
+            const dayPnl = price > 0 ? h.shares * price * (dayChg / 100) : 0;
+            const totalPnl = mktVal - h.costBasis;
+            const retPct = h.costBasis > 0 ? (totalPnl / h.costBasis) * 100 : 0;
 
-                // Update indicators if present
-                if (data.indicators) {
-                    const ind = data.indicators;
-                    if (ind.fedRate) document.getElementById('ind-fedfunds').textContent = ind.fedRate;
-                    if (ind.cpi) document.getElementById('ind-cpi').textContent = ind.cpi;
-                    if (ind.yield10y) document.getElementById('ind-10y').textContent = ind.yield10y;
-                    if (ind.yield2y) document.getElementById('ind-2y').textContent = ind.yield2y;
-                    if (ind.dxy) document.getElementById('ind-dxy').textContent = ind.dxy;
-                    if (ind.vix) document.getElementById('ind-vix').textContent = ind.vix;
-                }
+            h.priceAUD = price; h.dayChangePct = dayChg; h.marketValueAUD = mktVal;
+            h.dayPnlAUD = dayPnl; h.totalPnlAUD = totalPnl; h.returnPct = retPct; h.weight = 0;
 
-                // Render briefing
-                if (data.briefing) {
-                    let html = '<div class="briefing-headline">' + (data.briefing.headline || 'Market Brief') + '</div>';
-                    if (data.briefing.sections && Array.isArray(data.briefing.sections)) {
-                        data.briefing.sections.forEach(section => {
-                            html += '<div class="briefing-section"><div class="briefing-section-title">' + section.title + '</div>';
-                            html += '<div class="briefing-section-body">' + section.body + '</div></div>';
-                        });
-                    }
-                    dom.briefingContent.innerHTML = html;
-                } else {
-                    dom.briefingContent.textContent = 'Briefing data unavailable';
-                }
-            } catch (error) {
-                console.error('Macro fetch error:', error);
-                dom.briefingContent.innerHTML = '<span style="color: var(--red);">Error loading briefing</span>';
-            } finally {
-                dom.generateMacroBtn.classList.remove('loading');
-                dom.generateMacroBtn.disabled = false;
-            }
-        }
-
-        // ==================== CALCULATIONS ====================
-        function recalculatePortfolio() {
-            // Build price map with conversions
-            const priceMap = {};
-
-            portfolioState.holdings.forEach(h => {
-                const yf = h.yf;
-                let price = portfolioState.prices[yf] || 0;
-
-                // Convert USD to AUD if needed
-                if (h.currency === 'USD' && portfolioState.audusd > 0) {
-                    price = price / portfolioState.audusd;
-                }
-
-                priceMap[h.ticker] = {
-                    current: price,
-                    dayChange: portfolioState.changes[yf] || 0
-                };
-            });
-
-            // Calculate market values and P&L
-            let totalValue = 0;
-            let totalDayPnl = 0;
-            let totalUnrealizadPnl = 0;
-
-            portfolioState.holdings.forEach(h => {
-                const info = priceMap[h.ticker];
-                const marketValueAUD = h.shares * info.current;
-                const dayPnlAUD = h.shares * info.current * (info.dayChange / 100);
-                const totalPnlAUD = marketValueAUD - h.costBasis;
-                const returnPct = (totalPnlAUD / h.costBasis) * 100;
-
-                h.marketValueAUD = marketValueAUD;
-                h.weight = 0; // Will recalculate
-                h.dayPnlAUD = dayPnlAUD;
-                h.totalPnlAUD = totalPnlAUD;
-                h.returnPct = returnPct;
-                h.priceAUD = info.current;
-                h.dayChangePct = info.dayChange;
-
-                totalValue += marketValueAUD;
-                totalDayPnl += dayPnlAUD;
-                totalUnrealizadPnl += totalPnlAUD;
-            });
-
-            // Calculate weights
-            portfolioState.holdings.forEach(h => {
-                h.weight = totalValue > 0 ? (h.marketValueAUD / totalValue) * 100 : 0;
-            });
-
-            portfolioState.totalValue = totalValue;
-            portfolioState.totalDayPnl = totalDayPnl;
-            portfolioState.totalDayPnlPct = totalValue > 0 ? (totalDayPnl / totalValue) * 100 : 0;
-            portfolioState.unrealizedPnl = totalUnrealizadPnl;
-            portfolioState.totalReturn = totalValue - TOTAL_INVESTED;
-            portfolioState.totalReturnPct = TOTAL_INVESTED > 0 ? (portfolioState.totalReturn / TOTAL_INVESTED) * 100 : 0;
-
-            // Check reconciliation
-            const checkValue = TOTAL_INVESTED + REALIZED_PNL + totalUnrealizadPnl - TOTAL_FEES;
-            portfolioState.reconciliationError = Math.abs(checkValue - totalValue);
-            portfolioState.reconcileFail = portfolioState.reconciliationError > 10;
-        }
-
-        // ==================== RENDERING ====================
-        function updateStatusBar() {
-            if (portfolioState.isLive) {
-                dom.statusBadge.classList.remove('offline');
-                dom.statusText.textContent = 'LIVE';
-                dom.dataStatus.textContent = 'OK';
-            } else {
-                dom.statusBadge.classList.add('offline');
-                dom.statusText.textContent = 'OFFLINE';
-                dom.dataStatus.textContent = 'STALE';
-            }
-            updateTimestamp();
-        }
-
-        function renderPortfolioView() {
-            // Top cards
-            dom.totalValue.textContent = formatCurrency(portfolioState.totalValue);
-
-            const dayPnlEl = dom.dayPnl;
-            dayPnlEl.textContent = formatCurrency(portfolioState.totalDayPnl);
-            dayPnlEl.className = 'card-value ' + (portfolioState.totalDayPnl >= 0 ? 'text-positive' : 'text-negative');
-            dom.dayPnlPct.textContent = formatPercent(portfolioState.totalDayPnlPct);
-            dom.dayPnlPct.className = 'card-change ' + (portfolioState.totalDayPnlPct >= 0 ? 'positive' : 'negative');
-
-            const totalReturnEl = dom.totalReturn;
-            totalReturnEl.textContent = formatCurrency(portfolioState.totalReturn);
-            totalReturnEl.className = 'card-value ' + (portfolioState.totalReturn >= 0 ? 'text-positive' : 'text-negative');
-            dom.totalReturnPct.textContent = formatPercent(portfolioState.totalReturnPct);
-            dom.totalReturnPct.className = 'card-change ' + (portfolioState.totalReturnPct >= 0 ? 'positive' : 'negative');
-
-            // Reconciliation banner
-            if (portfolioState.reconcileFail) {
-                dom.reconciliationBanner.innerHTML = `
-                    <span class="status-text">RECONCILIATION FAIL (Δ ${formatCurrency(portfolioState.reconciliationError)})</span>
-                    <div class="reconciliation-parts">
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">Invested</div>
-                            <div class="reconciliation-part-value">${formatCurrency(TOTAL_INVESTED)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">+ Realized P&L</div>
-                            <div class="reconciliation-part-value">${formatCurrency(REALIZED_PNL)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">+ Unrealized P&L</div>
-                            <div class="reconciliation-part-value">${formatCurrency(portfolioState.unrealizedPnl)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">- Fees</div>
-                            <div class="reconciliation-part-value">${formatCurrency(TOTAL_FEES)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">= Current Value</div>
-                            <div class="reconciliation-part-value">${formatCurrency(portfolioState.totalValue)}</div>
-                        </div>
-                    </div>
-                `;
-                dom.reconciliationBanner.className = 'reconciliation-banner fail';
-            } else {
-                dom.reconciliationBanner.innerHTML = `
-                    <span class="status-text">✓ RECONCILIATION OK</span>
-                    <div class="reconciliation-parts">
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">Invested</div>
-                            <div class="reconciliation-part-value">${formatCurrency(TOTAL_INVESTED)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">+ Realized P&L</div>
-                            <div class="reconciliation-part-value">${formatCurrency(REALIZED_PNL)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">+ Unrealized P&L</div>
-                            <div class="reconciliation-part-value">${formatCurrency(portfolioState.unrealizedPnl)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">- Fees</div>
-                            <div class="reconciliation-part-value">${formatCurrency(TOTAL_FEES)}</div>
-                        </div>
-                        <div class="reconciliation-part">
-                            <div class="reconciliation-part-label">= Current Value</div>
-                            <div class="reconciliation-part-value">${formatCurrency(portfolioState.totalValue)}</div>
-                        </div>
-                    </div>
-                `;
-                dom.reconciliationBanner.className = 'reconciliation-banner';
+            let sma50 = tech.sma50 ?? ext.fiftyDayAvg ?? null;
+            let high52 = ext.fiftyTwoWeekHigh ?? tech.fiftyTwoWeekHigh ?? null;
+            let low52 = ext.fiftyTwoWeekLow ?? tech.fiftyTwoWeekLow ?? null;
+            if (h.currency === 'USD' && S.audusd > 0) {
+                if (sma50 != null) sma50 = sma50 / S.audusd;
+                if (high52 != null) high52 = high52 / S.audusd;
+                if (low52 != null) low52 = low52 / S.audusd;
             }
 
-            // Holdings table - sorted by market value descending
-            const sorted = [...portfolioState.holdings].sort((a, b) => b.marketValueAUD - a.marketValueAUD);
-            dom.holdingsBody.innerHTML = sorted.map(h => {
-                const statusBadge = getStatusBadge((h.priceAUD - h.avgCost) / h.avgCost, h.dayChangePct);
-                const action = getActionRecommendation(h, h.weight / 100, h.conviction, h.returnPct / 100);
-                return `
-                    <tr>
-                        <td><strong>${h.ticker}</strong></td>
-                        <td>${h.name}</td>
-                        <td>${h.assetClass}</td>
-                        <td class="num">${formatNumber(h.shares, 2)}</td>
-                        <td class="num">A$ ${formatPrice(h.avgCost, 2)}</td>
-                        <td class="num">A$ ${formatPrice(h.priceAUD, 2)}</td>
-                        <td class="num">${formatCurrency(h.marketValueAUD, 0)}</td>
-                        <td class="num">${formatNumber(h.weight, 1)}</td>
-                        <td class="num ${h.dayPnlAUD >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(h.dayPnlAUD, 0)}</td>
-                        <td class="num ${h.totalPnlAUD >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(h.totalPnlAUD, 0)}</td>
-                        <td class="num ${h.returnPct >= 0 ? 'text-positive' : 'text-negative'}">${formatPercent(h.returnPct, 1)}</td>
-                        <td><span class="badge ${statusBadge.class}">${statusBadge.text}</span></td>
-                        <td><span class="badge badge-neutral">${action}</span></td>
-                    </tr>
-                `;
-            }).join('');
+            h.sma50 = sma50;
+            h.vs50d = (sma50 && sma50 > 0) ? ((price - sma50) / sma50) * 100 : null;
+            h.rsi = tech.rsi ?? null;
+            h.roc1m = tech.roc1m ?? null;
+            h.high52 = high52; h.low52 = low52;
+            h.vs52wHigh = (high52 && high52 > 0) ? ((price - high52) / high52) * 100 : null;
 
-            // Allocation chart (donut by asset class)
-            renderAllocationChart();
-        }
-
-        function renderAllocationChart() {
-            const assetClassMap = {};
-            portfolioState.holdings.forEach(h => {
-                if (!assetClassMap[h.assetClass]) {
-                    assetClassMap[h.assetClass] = 0;
-                }
-                assetClassMap[h.assetClass] += h.marketValueAUD;
-            });
-
-            const colors = ['#58a6ff', '#3fb950', '#f85149', '#f0883e', '#8957e5'];
-            const classes = Object.keys(assetClassMap);
-            const total = portfolioState.totalValue || 1;
-
-            let svg = `<circle cx="150" cy="150" r="120" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>`;
-
-            let angle = -90;
-            classes.forEach((cls, i) => {
-                const value = assetClassMap[cls];
-                const pct = (value / total) * 100;
-                const sliceAngle = (pct / 100) * 360;
-
-                const x1 = 150 + 120 * Math.cos((angle) * Math.PI / 180);
-                const y1 = 150 + 120 * Math.sin((angle) * Math.PI / 180);
-                const x2 = 150 + 120 * Math.cos((angle + sliceAngle) * Math.PI / 180);
-                const y2 = 150 + 120 * Math.sin((angle + sliceAngle) * Math.PI / 180);
-
-                const largeArc = sliceAngle > 180 ? 1 : 0;
-                const pathData = `M 150 150 L ${x1} ${y1} A 120 120 0 ${largeArc} 1 ${x2} ${y2} Z`;
-
-                svg += `<path d="${pathData}" fill="${colors[i % colors.length]}" stroke="var(--bg-primary)" stroke-width="2"/>`;
-
-                const labelAngle = angle + sliceAngle / 2;
-                const labelX = 150 + 75 * Math.cos(labelAngle * Math.PI / 180);
-                const labelY = 150 + 75 * Math.sin(labelAngle * Math.PI / 180);
-
-                svg += `<text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--bg-primary)" font-weight="600">${pct.toFixed(0)}%</text>`;
-
-                angle += sliceAngle;
-            });
-
-            // Legend
-            svg += `<g>`;
-            classes.forEach((cls, i) => {
-                const y = 280 + i * 16;
-                svg += `<rect x="20" y="${y}" width="10" height="10" fill="${colors[i % colors.length]}"/>`;
-                svg += `<text x="35" y="${y + 8}" font-size="10" fill="var(--text-primary)">${cls}</text>`;
-            });
-            svg += `</g>`;
-
-            dom.allocationChart.innerHTML = svg;
-        }
-
-        function renderRiskView() {
-            // Concentration metrics
-            const largest = [...portfolioState.holdings].sort((a, b) => b.weight - a.weight)[0];
-            const top3 = portfolioState.holdings.sort((a, b) => b.weight - a.weight).slice(0, 3);
-            const top3Weight = top3.reduce((s, h) => s + h.weight, 0);
-
-            const cryptoWeight = portfolioState.holdings
-                .filter(h => h.assetClass === 'Crypto')
-                .reduce((s, h) => s + h.weight, 0);
-
-            const speculativeWeight = portfolioState.holdings
-                .filter(h => h.positionType === 'speculative')
-                .reduce((s, h) => s + h.weight, 0);
-
-            const usdWeight = portfolioState.holdings
-                .filter(h => h.currency === 'USD')
-                .reduce((s, h) => s + h.weight, 0);
-
-            const themeMap = {};
-            portfolioState.holdings.forEach(h => {
-                themeMap[h.theme] = (themeMap[h.theme] || 0) + h.weight;
-            });
-            const largestTheme = Object.entries(themeMap).sort((a, b) => b[1] - a[1])[0];
-
-            const risks = [
-                {
-                    metric: 'Largest Position',
-                    value: `${largest.ticker}: ${largest.weight.toFixed(1)}%`,
-                    severity: largest.weight > 20 ? 'Severe' : largest.weight > 15 ? 'Elevated' : 'Manageable',
-                    interpretation: `${largest.ticker} dominance creates concentration risk. Consider trimming above 20%.`
-                },
-                {
-                    metric: 'Top 3 Concentration',
-                    value: `${top3Weight.toFixed(1)}%`,
-                    severity: top3Weight > 70 ? 'Severe' : top3Weight > 60 ? 'Elevated' : 'Manageable',
-                    interpretation: `Top 3 holdings control ${top3Weight.toFixed(1)}% of portfolio. Diversification needed above 70%.`
-                },
-                {
-                    metric: 'Crypto Exposure',
-                    value: `${cryptoWeight.toFixed(1)}%`,
-                    severity: cryptoWeight > 85 ? 'Severe' : cryptoWeight > 70 ? 'Elevated' : 'Manageable',
-                    interpretation: `${cryptoWeight.toFixed(1)}% in crypto. High volatility and correlation risk. Consider equity buffer.`
-                },
-                {
-                    metric: 'Speculative Sleeve',
-                    value: `${speculativeWeight.toFixed(1)}%`,
-                    severity: speculativeWeight > 20 ? 'Elevated' : 'Manageable',
-                    interpretation: `${speculativeWeight.toFixed(1)}% in speculative positions (low conviction). Suitable for risk capital.`
-                },
-                {
-                    metric: 'FX Exposure (USD)',
-                    value: `${usdWeight.toFixed(1)}%`,
-                    severity: usdWeight > 30 ? 'Elevated' : 'Manageable',
-                    interpretation: `${usdWeight.toFixed(1)}% in USD-denominated assets. AUD strength benefits portfolio; weakness headwind.`
-                },
-                {
-                    metric: 'Largest Theme',
-                    value: `${largestTheme[0]}: ${largestTheme[1].toFixed(1)}%`,
-                    severity: largestTheme[1] > 50 ? 'Elevated' : 'Manageable',
-                    interpretation: `${largestTheme[0]} represents ${largestTheme[1].toFixed(1)}% of portfolio. Single-theme risk.`
-                }
-            ];
-
-            dom.riskBody.innerHTML = risks.map(r => {
-                const severityClass = r.severity === 'Severe' ? 'badge-severe' : r.severity === 'Elevated' ? 'badge-elevated' : 'badge-manageable';
-                return `
-                    <tr>
-                        <td><strong>${r.metric}</strong></td>
-                        <td class="num">${r.value}</td>
-                        <td><span class="badge ${severityClass}">${r.severity}</span></td>
-                        <td>${r.interpretation}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Current vs target
-            let currentAllocation = {};
-            Object.entries(TARGET_ALLOCATION).forEach(([bucket, config]) => {
-                currentAllocation[bucket] = {
-                    tickers: config.holdings || [],
-                    target: config.target * 100
-                };
-                currentAllocation[bucket].current = config.holdings
-                    ? portfolioState.holdings
-                        .filter(h => config.holdings.includes(h.ticker))
-                        .reduce((s, h) => s + h.weight, 0)
-                    : 0; // Cash
-            });
-
-            // Add cash bucket
-            const cashAllocated = Object.entries(currentAllocation)
-                .reduce((s, [k, v]) => s + (k !== 'Cash / Reserve' ? v.current : 0), 0);
-            currentAllocation['Cash / Reserve'].current = 100 - cashAllocated;
-
-            dom.allocationBody.innerHTML = Object.entries(currentAllocation).map(([bucket, data]) => {
-                const drift = data.current - data.target;
-                const driftAUD = (drift / 100) * portfolioState.totalValue;
-                const action = drift > 5 ? 'TRIM' : drift < -5 ? 'ADD' : 'HOLD';
-                return `
-                    <tr>
-                        <td><strong>${bucket}</strong></td>
-                        <td class="num">${data.current.toFixed(1)}</td>
-                        <td class="num">${data.target.toFixed(1)}</td>
-                        <td class="num ${drift > 0 ? 'text-negative' : 'text-positive'}">${(drift > 0 ? '+' : '') + drift.toFixed(1)}</td>
-                        <td class="num">${formatCurrency(driftAUD, 0)}</td>
-                        <td><span class="badge badge-neutral">${action}</span></td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Characterization
-            const charText = `This is a concentrated crypto-dominated portfolio with ${cryptoWeight.toFixed(0)}% exposure, ${speculativeWeight.toFixed(0)}% speculative sleeve, and ${(100 - cashAllocated).toFixed(0)}% cash. One equity position (AMZN) provides minimal diversification. No cash buffer. Suitable for risk-tolerant investors with strong conviction in crypto narratives.`;
-            dom.characterization.textContent = charText;
-        }
-
-        function renderAttributionView() {
-            // Why moved
-            const topMovers = [...portfolioState.holdings]
-                .filter(h => Math.abs(h.dayPnlAUD) > 1)
-                .sort((a, b) => Math.abs(b.dayPnlAUD) - Math.abs(a.dayPnlAUD))
-                .slice(0, 6);
-
-            let whyText = '';
-            topMovers.forEach(h => {
-                const direction = h.dayPnlAUD >= 0 ? 'gained' : 'lost';
-                const contrib = (h.dayPnlAUD / portfolioState.totalDayPnl * 100) || 0;
-                whyText += `<li>${h.ticker} ${direction} ${formatCurrency(Math.abs(h.dayPnlAUD), 0)} (${contrib.toFixed(1)}% of move)</li>`;
-            });
-            if (!whyText) whyText = '<li>Minor day-to-day fluctuations across all holdings.</li>';
-            dom.whyMovedList.innerHTML = whyText;
-
-            // Contribution by holding
-            const sorted = [...portfolioState.holdings].sort((a, b) => Math.abs(b.dayPnlAUD) - Math.abs(a.dayPnlAUD));
-            dom.contributionBody.innerHTML = sorted.map(h => {
-                const dayContrib = (h.dayPnlAUD / portfolioState.totalDayPnl * 100) || 0;
-                const statusBadge = getStatusBadge((h.priceAUD - h.avgCost) / h.avgCost, h.dayChangePct);
-                const comment = h.dayChangePct > 0 ? 'Upside' : h.dayChangePct < 0 ? 'Downside' : 'Flat';
-                return `
-                    <tr>
-                        <td><strong>${h.ticker}</strong></td>
-                        <td class="num">${h.weight.toFixed(1)}</td>
-                        <td class="num ${h.dayPnlAUD >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(h.dayPnlAUD, 0)}</td>
-                        <td class="num">${dayContrib.toFixed(1)}</td>
-                        <td class="num ${h.totalPnlAUD >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(h.totalPnlAUD, 0)}</td>
-                        <td><span class="badge ${statusBadge.class}">${statusBadge.text}</span></td>
-                        <td>${comment}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            // By asset class
-            const classPnl = {};
-            portfolioState.holdings.forEach(h => {
-                if (!classPnl[h.assetClass]) {
-                    classPnl[h.assetClass] = { dayPnl: 0, totalPnl: 0, weight: 0 };
-                }
-                classPnl[h.assetClass].dayPnl += h.dayPnlAUD;
-                classPnl[h.assetClass].totalPnl += h.totalPnlAUD;
-                classPnl[h.assetClass].weight += h.weight;
-            });
-
-            dom.classAttributionBody.innerHTML = Object.entries(classPnl).map(([cls, data]) => {
-                const comment = data.totalPnl >= 0 ? 'Outperforming' : 'Underperforming';
-                return `
-                    <tr>
-                        <td><strong>${cls}</strong></td>
-                        <td class="num">${data.weight.toFixed(1)}</td>
-                        <td class="num ${data.dayPnl >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(data.dayPnl, 0)}</td>
-                        <td class="num ${data.totalPnl >= 0 ? 'text-positive' : 'text-negative'}">${formatCurrency(data.totalPnl, 0)}</td>
-                        <td>${comment}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function renderPlaybookView() {
-            // Action queue
-            const actions = [
-                {
-                    priority: 1,
-                    ticker: 'PENGU',
-                    action: 'EXIT',
-                    size: portfolioState.holdings.find(h => h.ticker === 'PENGU')?.marketValueAUD || 0,
-                    source: 'Liquidate',
-                    rationale: 'Dead money, zero conviction, tiny position, redeploy proceeds',
-                    risk: 'Minimal execution'
-                },
-                {
-                    priority: 2,
-                    ticker: 'DOGE',
-                    action: 'TRIM 30%',
-                    size: (portfolioState.holdings.find(h => h.ticker === 'DOGE')?.marketValueAUD || 0) * 0.3,
-                    source: 'Rebalance',
-                    rationale: 'Low conviction, speculative, reduce weight below 8%, lock in gains',
-                    risk: 'Miss further upside if bull thesis activated'
-                },
-                {
-                    priority: 3,
-                    ticker: 'SOL/ETH',
-                    action: 'WATCH',
-                    size: 0,
-                    source: 'Monitor',
-                    rationale: 'Core positions down; thesis intact; consider adds on further 15% weakness',
-                    risk: 'Averaging down before reversal'
-                },
-                {
-                    priority: 4,
-                    ticker: 'SUI',
-                    action: 'HOLD',
-                    size: 0,
-                    source: 'N/A',
-                    rationale: 'Satellite position, execution layer thesis still valid, medium conviction',
-                    risk: 'Dilution risk if ecosystem fractures'
-                },
-                {
-                    priority: 5,
-                    ticker: 'AMZN',
-                    action: 'HOLD',
-                    size: 0,
-                    source: 'N/A',
-                    rationale: 'Only equity, positive P&L, AI/cloud narrative intact',
-                    risk: 'Multiple compression on rate hikes'
-                },
-                {
-                    priority: 6,
-                    ticker: 'CASH',
-                    action: 'BUILD BUFFER',
-                    size: 5000,
-                    source: 'EXIT PENGU + TRIM DOGE',
-                    rationale: '0% cash currently; raise 5k+ for opportunities; reduce leverage risk',
-                    risk: 'Opportunity cost if markets rally'
-                }
-            ];
-
-            dom.actionQueueBody.innerHTML = actions.map(a => {
-                const riskColor = a.risk.includes('Minimal') ? 'badge-manageable' : 'badge-elevated';
-                return `
-                    <tr>
-                        <td><strong>${a.priority}</strong></td>
-                        <td>${a.ticker}</td>
-                        <td><span class="badge badge-neutral">${a.action}</span></td>
-                        <td class="num">${a.size > 0 ? formatCurrency(a.size, 0) : '—'}</td>
-                        <td>${a.source}</td>
-                        <td>${a.rationale}</td>
-                        <td><span class="badge ${riskColor}">${a.risk}</span></td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Thesis table
-            const theses = [
-                {
-                    ticker: 'SOL',
-                    thesis: 'L1 infrastructure play; MEV resistance, low fees, DeFi narrative recovery',
-                    status: 'INTACT',
-                    addOn: 'Break below 100 AUD',
-                    trimOn: 'Break above 250 AUD',
-                    invalidation: 'Network outages, validator exodus',
-                    catalyst: 'Q2 DeFi TVL recovery, Firedancer launch'
-                },
-                {
-                    ticker: 'ETH',
-                    thesis: 'Blue-chip smart contract layer; staking yields, Shanghai upgrade benefits, rollup ecosystem',
-                    status: 'INTACT',
-                    addOn: 'Break below 3500 AUD',
-                    trimOn: 'Break above 4500 AUD',
-                    invalidation: 'Base layer obsolescence, rollup centralization',
-                    catalyst: 'Dencun upgrade, staking yield improvement'
-                },
-                {
-                    ticker: 'AMZN',
-                    thesis: 'Cloud/AI growth; AWS margin expansion, advertising upside, AI infrastructure play',
-                    status: 'INTACT',
-                    addOn: 'Earnings miss, break below 150 USD',
-                    trimOn: 'Multiple expansion >40x, AI fears subside',
-                    invalidation: 'AWS market share loss to MSFT/GOOG',
-                    catalyst: 'Q1 earnings (AWS growth +15%+), AI service adoption'
-                },
-                {
-                    ticker: 'DOGE',
-                    thesis: 'Community meme momentum; Elon Twitter integration, retail adoption, low conviction trade',
-                    status: 'QUESTIONABLE',
-                    addOn: 'Do not add',
-                    trimOn: 'Any 20%+ rally from entry',
-                    invalidation: 'Loss of cultural relevance, Elon negative catalyst',
-                    catalyst: 'Twitter integration (uncertain timeline)'
-                },
-                {
-                    ticker: 'SUI',
-                    thesis: 'Execution layer infrastructure; Move language, throughput, potential validator APY',
-                    status: 'WATCHFUL',
-                    addOn: 'Ecosystem adoption shows in metrics',
-                    trimOn: 'Break above 8 USD; take profits on 100%+ gains',
-                    invalidation: 'Aptos/Move adoption leader emerges, SUI loses mindshare',
-                    catalyst: 'Mainnet performance data, major app launch'
-                },
-                {
-                    ticker: 'PENGU',
-                    thesis: 'NFT/IP speculation; Pudgy penguin brand, no fundamental support',
-                    status: 'INVALIDATED',
-                    addOn: 'Do not add',
-                    trimOn: 'Exit all',
-                    invalidation: 'Already invalidated; dead money',
-                    catalyst: 'None'
-                }
-            ];
-
-            dom.thesisBody.innerHTML = theses.map(t => {
-                const statusColor = t.status === 'INTACT' ? 'badge-bullish' : t.status === 'QUESTIONABLE' ? 'badge-neutral' : t.status === 'INVALIDATED' ? 'badge-bearish' : 'badge-elevated';
-                return `
-                    <tr>
-                        <td><strong>${t.ticker}</strong></td>
-                        <td style="font-size: 9px;">${t.thesis}</td>
-                        <td><span class="badge ${statusColor}">${t.status}</span></td>
-                        <td style="font-size: 9px;">${t.addOn}</td>
-                        <td style="font-size: 9px;">${t.trimOn}</td>
-                        <td style="font-size: 9px;">${t.invalidation}</td>
-                        <td style="font-size: 9px;">${t.catalyst}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function render() {
-            renderPortfolioView();
-            renderRiskView();
-            renderAttributionView();
-            renderPlaybookView();
-        }
-
-        // ==================== VIEW SWITCHING ====================
-        document.querySelectorAll('.sidebar-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const viewName = tab.dataset.view;
-
-                document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-
-                tab.classList.add('active');
-                const viewEl = document.querySelector(`.view[data-view="${viewName}"]`) || document.getElementById(`${viewName}View`);
-                if (viewEl) viewEl.classList.add('active');
-            });
+            totalValue += mktVal; totalDayPnl += dayPnl; totalUnrealizedPnl += totalPnl;
         });
 
-        // ==================== EVENT LISTENERS ====================
-        dom.refreshBtn.addEventListener('click', fetchPrices);
-        dom.generateMacroBtn.addEventListener('click', fetchMacroBriefing);
+        S.holdings.forEach(h => { h.weight = totalValue > 0 ? (h.marketValueAUD / totalValue) * 100 : 0; });
 
-        // ==================== INITIALIZATION ====================
-        function init() {
-            updateStatusBar();
-            setInterval(updateTimestamp, 1000);
+        S.totalValue = totalValue;
+        S.totalDayPnl = totalDayPnl;
+        S.totalDayPnlPct = totalValue > 0 ? (totalDayPnl / totalValue) * 100 : 0;
+        S.unrealizedPnl = totalUnrealizedPnl;
+        S.totalReturn = totalUnrealizedPnl + REALIZED_PNL - TOTAL_FEES;
+        S.totalReturnPct = TOTAL_COST_BASIS > 0 ? (S.totalReturn / TOTAL_COST_BASIS) * 100 : 0;
 
-            // Load initial prices
-            fetchPrices();
+        // RECONCILIATION: Cost Basis (open) + Unrealized P&L === Total Market Value
+        const openCostBasis = S.holdings.reduce((s, h) => s + h.costBasis, 0);
+        S.reconcileError = Math.abs((openCostBasis + totalUnrealizedPnl) - totalValue);
+        S.reconcileOk = S.reconcileError < 1;
+    }
+
+    // ==================== RENDERING ====================
+    function updateStatusBar() {
+        const badge = document.getElementById('statusBadge');
+        const text = document.getElementById('statusText');
+        if (S.isLive) { badge.classList.remove('offline'); text.textContent = 'LIVE'; document.getElementById('dataStatus').textContent = 'OK'; }
+        else { badge.classList.add('offline'); text.textContent = 'OFFLINE'; document.getElementById('dataStatus').textContent = 'STALE'; }
+        const rl = document.getElementById('regimeLabel');
+        rl.textContent = S.regime;
+        rl.className = 'regime-label ' + (S.regime === 'RISK-ON' ? 'regime-risk-on' : S.regime === 'RISK-OFF' ? 'regime-risk-off' : 'regime-choppy');
+        document.getElementById('timestamp').textContent = new Date().toTimeString().slice(0, 8);
+    }
+
+    function renderPortfolioView() {
+        document.getElementById('portfolioCards').innerHTML = `
+            <div class="card"><div class="card-label">Total Value</div><div class="card-value">${fmtC(S.totalValue)}</div></div>
+            <div class="card"><div class="card-label">Day P&L</div><div class="card-value ${clr(S.totalDayPnl)}">${fmtC(S.totalDayPnl)}</div><div class="card-change ${S.totalDayPnl>=0?'positive':'negative'}">${fmtP(S.totalDayPnlPct)}</div></div>
+            <div class="card"><div class="card-label">Total Return</div><div class="card-value ${clr(S.totalReturn)}">${fmtC(S.totalReturn)}</div><div class="card-change ${S.totalReturn>=0?'positive':'negative'}">${fmtP(S.totalReturnPct)}</div></div>
+            <div class="card"><div class="card-label">Invested Capital</div><div class="card-value">A$ 26,333.92</div></div>
+            <div class="card"><div class="card-label">Realized P&L</div><div class="card-value ${clr(REALIZED_PNL)}">${fmtC(REALIZED_PNL)}</div></div>
+            <div class="card"><div class="card-label">Cash Balance</div><div class="card-value">${fmtC(CASH_BALANCE)}</div></div>`;
+
+        // Reconciliation
+        const rb = document.getElementById('reconciliationBanner');
+        const parts = `<div class="reconciliation-parts">
+            <div class="reconciliation-part"><div class="reconciliation-part-label">Cost Basis (Open)</div><div class="reconciliation-part-value">${fmtC(TOTAL_COST_BASIS)}</div></div>
+            <div class="reconciliation-part"><div class="reconciliation-part-label">+ Unrealized P&L</div><div class="reconciliation-part-value">${fmtC(S.unrealizedPnl)}</div></div>
+            <div class="reconciliation-part"><div class="reconciliation-part-label">= Market Value</div><div class="reconciliation-part-value">${fmtC(S.totalValue)}</div></div>
+            <div class="reconciliation-part"><div class="reconciliation-part-label">Realized P&L</div><div class="reconciliation-part-value">${fmtC(REALIZED_PNL)}</div></div>
+            <div class="reconciliation-part"><div class="reconciliation-part-label">Fees</div><div class="reconciliation-part-value">${fmtC(TOTAL_FEES)}</div></div></div>`;
+        if (S.reconcileOk) { rb.innerHTML = `<span class="status-text">RECONCILIATION PASS</span>${parts}`; rb.className = 'reconciliation-banner pass'; }
+        else { rb.innerHTML = `<span class="status-text">RECONCILIATION FAIL (delta ${fmtC(S.reconcileError)})</span>${parts}`; rb.className = 'reconciliation-banner fail'; }
+
+        // Holdings table
+        const sorted = [...S.holdings].sort((a, b) => b.marketValueAUD - a.marketValueAUD);
+        document.getElementById('holdingsBody').innerHTML = sorted.map(h => {
+            const status = classifyTechnical(h);
+            const action = computeAction(h);
+            const target = (POSITION_TARGETS[h.ticker] || 0) * 100;
+            const drift = h.weight - target;
+            return `<tr>
+                <td><strong>${h.ticker}</strong></td><td>${h.name}</td><td>${h.assetClass}</td><td style="font-size:9px">${h.theme}</td>
+                <td class="num">${fmtN(h.shares,2)}</td><td class="num">${fmtPr(h.avgCost)}</td><td class="num">${fmtPr(h.priceAUD)}</td>
+                <td class="num">${fmtC(h.marketValueAUD,0)}</td><td class="num">${fmtN(h.weight,1)}</td>
+                <td class="num ${clr(h.dayPnlAUD)}">${fmtC(h.dayPnlAUD,0)}</td>
+                <td class="num ${clr(h.totalPnlAUD)}">${fmtC(h.totalPnlAUD,0)}</td>
+                <td class="num ${clr(h.returnPct)}">${fmtP(h.returnPct)}</td>
+                <td class="num">${h.vs50d!=null?fmtP(h.vs50d):'--'}</td>
+                <td class="num">${h.roc1m!=null?fmtP(h.roc1m):'--'}</td>
+                <td class="num">${h.rsi!=null?fmtN(h.rsi,0):'--'}</td>
+                <td class="num">${h.vs52wHigh!=null?fmtP(h.vs52wHigh):'--'}</td>
+                <td><span class="badge ${status.class}">${status.text}</span></td>
+                <td class="num">${fmtN(target,0)}</td>
+                <td class="num ${drift>3?'text-negative':drift<-3?'text-positive':''}">${fmtP(drift,1)}</td>
+                <td><span class="badge ${action==='EXIT'?'badge-severe':action==='TRIM'?'badge-elevated':action==='ADD'?'badge-bullish':action==='WATCH'?'badge-blue':'badge-neutral'}">${action}</span></td>
+            </tr>`;
+        }).join('');
+
+        // Allocation donut
+        const classMap = {};
+        S.holdings.forEach(h => { classMap[h.assetClass] = (classMap[h.assetClass] || 0) + h.marketValueAUD; });
+        const colors = ['#58a6ff', '#3fb950', '#f85149', '#f0883e', '#8957e5'];
+        const classes = Object.keys(classMap);
+        const total = S.totalValue || 1;
+        let svg = `<circle cx="150" cy="150" r="120" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>`;
+        let angle = -90;
+        classes.forEach((cls, i) => {
+            const pct = (classMap[cls] / total) * 100;
+            const slice = (pct / 100) * 360;
+            const x1 = 150+120*Math.cos(angle*Math.PI/180), y1 = 150+120*Math.sin(angle*Math.PI/180);
+            const x2 = 150+120*Math.cos((angle+slice)*Math.PI/180), y2 = 150+120*Math.sin((angle+slice)*Math.PI/180);
+            svg += `<path d="M 150 150 L ${x1} ${y1} A 120 120 0 ${slice>180?1:0} 1 ${x2} ${y2} Z" fill="${colors[i%colors.length]}" stroke="var(--bg-primary)" stroke-width="2"/>`;
+            const la = angle + slice/2;
+            svg += `<text x="${150+75*Math.cos(la*Math.PI/180)}" y="${150+75*Math.sin(la*Math.PI/180)}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--bg-primary)" font-weight="600">${pct.toFixed(0)}%</text>`;
+            angle += slice;
+        });
+        svg += '<g>';
+        classes.forEach((cls, i) => { const y = 285+i*16; svg += `<rect x="20" y="${y}" width="10" height="10" fill="${colors[i%colors.length]}"/><text x="35" y="${y+8}" font-size="10" fill="var(--text-primary)">${cls} (${((classMap[cls]/total)*100).toFixed(1)}%)</text>`; });
+        svg += '</g>';
+        document.getElementById('allocationChart').innerHTML = svg;
+    }
+
+    function renderRiskView() {
+        const hs = S.holdings;
+        const sorted = [...hs].sort((a, b) => b.weight - a.weight);
+        const largest = sorted[0];
+        const top3W = sorted.slice(0,3).reduce((s,h)=>s+h.weight,0);
+        const cryptoW = hs.filter(h=>h.assetClass==='Crypto').reduce((s,h)=>s+h.weight,0);
+        const equityW = hs.filter(h=>h.assetClass==='US Equities').reduce((s,h)=>s+h.weight,0);
+        const specW = hs.filter(h=>h.positionType==='speculative').reduce((s,h)=>s+h.weight,0);
+        const usdW = hs.filter(h=>h.currency==='USD').reduce((s,h)=>s+h.weight,0);
+        const themeMap = {}; hs.forEach(h => { themeMap[h.theme] = (themeMap[h.theme]||0)+h.weight; });
+        const bigTheme = Object.entries(themeMap).sort((a,b)=>b[1]-a[1])[0];
+
+        const sev = (v,t) => v > t[0] ? 'Severe' : v > t[1] ? 'Elevated' : 'Manageable';
+        const risks = [
+            { m: 'Largest Position', v: `${largest.ticker}: ${fmtN(largest.weight,1)}%`, s: sev(largest.weight,[35,20]), i: `${largest.ticker} at ${fmtN(largest.weight,1)}%. >35% Severe, 20-35% Elevated.` },
+            { m: 'Top 3 Concentration', v: `${fmtN(top3W,1)}%`, s: sev(top3W,[75,60]), i: `Top 3 at ${fmtN(top3W,1)}%. >75% Severe.` },
+            { m: 'Asset Class (Crypto)', v: `${fmtN(cryptoW,1)}%`, s: sev(cryptoW,[60,45]), i: `Crypto at ${fmtN(cryptoW,1)}%. >60% = Severe single-class concentration.` },
+            { m: 'Speculative Sleeve', v: `${fmtN(specW,1)}%`, s: sev(specW,[15,8]), i: `Spec positions at ${fmtN(specW,1)}%. >15% Severe.` },
+            { m: 'FX Exposure (USD)', v: `${fmtN(usdW,1)}%`, s: usdW>40?'Elevated':'Manageable', i: `${fmtN(usdW,1)}% USD-denominated. AUD/USD swings affect valuation.` },
+            { m: 'Largest Theme', v: `${bigTheme[0]}: ${fmtN(bigTheme[1],1)}%`, s: bigTheme[1]>50?'Elevated':'Manageable', i: `Single-theme risk at ${fmtN(bigTheme[1],1)}%.` },
+            { m: 'Cash Allocation', v: '0.0%', s: 'Severe', i: 'Zero cash buffer. No dry powder for drawdowns or opportunities.' },
+        ];
+        document.getElementById('riskBody').innerHTML = risks.map(r => {
+            const sc = r.s==='Severe'?'badge-severe':r.s==='Elevated'?'badge-elevated':'badge-manageable';
+            return `<tr><td><strong>${r.m}</strong></td><td class="num">${r.v}</td><td><span class="badge ${sc}">${r.s}</span></td><td>${r.i}</td></tr>`;
+        }).join('');
+
+        // Bucket drift
+        let allocatedW = 0;
+        const bucketRows = [];
+        Object.entries(TARGET_ALLOCATION_BUCKETS).forEach(([name, cfg]) => {
+            const cw = cfg.holdings.length > 0 ? hs.filter(h => cfg.holdings.includes(h.ticker)).reduce((s,h) => s+h.weight, 0) : 0;
+            if (name !== 'Cash / Reserve') allocatedW += cw;
+            const tw = cfg.target * 100;
+            const drift = name === 'Cash / Reserve' ? (100 - allocatedW) - tw : cw - tw;
+            const dA = (drift/100)*S.totalValue;
+            const act = drift > 5 ? 'TRIM' : drift < -5 ? 'ADD' : 'HOLD';
+            const why = drift>5?`Overweight ${fmtN(Math.abs(drift),1)}% — trim ${fmtC(Math.abs(dA),0)}`:drift<-5?`Underweight ${fmtN(Math.abs(drift),1)}% — add ${fmtC(Math.abs(dA),0)}`:'Within tolerance';
+            bucketRows.push({ name, cw: name==='Cash / Reserve'?Math.max(0,100-allocatedW):cw, tw, drift, dA, act, why });
+        });
+        document.getElementById('allocationBucketBody').innerHTML = bucketRows.map(r =>
+            `<tr><td><strong>${r.name}</strong></td><td class="num">${fmtN(r.cw,1)}</td><td class="num">${fmtN(r.tw,1)}</td>
+            <td class="num ${r.drift>3?'text-negative':r.drift<-3?'text-positive':''}">${fmtP(r.drift,1)}</td>
+            <td class="num">${fmtC(r.dA,0)}</td><td><span class="badge badge-neutral">${r.act}</span></td><td style="font-size:9px">${r.why}</td></tr>`
+        ).join('');
+
+        // Position drift
+        document.getElementById('positionDriftBody').innerHTML = sorted.map(h => {
+            const t = (POSITION_TARGETS[h.ticker]||0)*100, d = h.weight-t, dA = (d/100)*S.totalValue;
+            return `<tr><td><strong>${h.ticker}</strong></td><td class="num">${fmtN(h.weight,1)}</td><td class="num">${fmtN(t,1)}</td>
+                <td class="num ${d>3?'text-negative':d<-3?'text-positive':''}">${fmtP(d,1)}</td><td class="num">${fmtC(dA,0)}</td>
+                <td><span class="badge badge-neutral">${d>5?'TRIM':d<-5?'ADD':'HOLD'}</span></td></tr>`;
+        }).join('');
+
+        const notDiv = largest.weight > 25 || top3W > 60 || cryptoW > 60 || specW > 15;
+        document.getElementById('characterization').textContent = notDiv
+            ? `This is NOT a diversified portfolio. Concentrated crypto-dominated risk book: ${fmtN(cryptoW,0)}% crypto, ${fmtN(specW,0)}% speculative, zero cash. AMZN (${fmtN(equityW,0)}%) provides minimal diversification. Dominated by crypto beta — not intentional alpha-seeking given low-conviction speculative positions.`
+            : `Portfolio is reasonably diversified with managed concentration levels.`;
+    }
+
+    function renderAttributionView() {
+        const movers = [...S.holdings].filter(h=>Math.abs(h.dayPnlAUD)>0.5).sort((a,b)=>Math.abs(b.dayPnlAUD)-Math.abs(a.dayPnlAUD));
+        const totalDP = S.totalDayPnl;
+        let bullets = '';
+        if (movers.length > 0 && Math.abs(totalDP) > 1) {
+            const top2 = movers.slice(0,2);
+            const t2p = Math.abs(totalDP)>0 ? (top2.reduce((s,h)=>s+Math.abs(h.dayPnlAUD),0)/Math.abs(totalDP)*100) : 0;
+            bullets += `<li><strong>${top2.map(h=>h.ticker).join(' and ')}</strong> drove ${fmtN(t2p,0)}% of today's move.</li>`;
+            const cP = S.holdings.filter(h=>h.assetClass==='Crypto').reduce((s,h)=>s+h.dayPnlAUD,0);
+            const eP = S.holdings.filter(h=>h.assetClass==='US Equities').reduce((s,h)=>s+h.dayPnlAUD,0);
+            bullets += `<li>Crypto: ${fmtC(cP,0)} | US Equities: ${fmtC(eP,0)}</li>`;
+            const audChg = S.macroChanges['AUDUSD=X'];
+            if (audChg != null && Math.abs(audChg) > 0.1) {
+                bullets += `<li>AUD ${audChg>0?'strengthened':'weakened'} ${fmtN(Math.abs(audChg),2)}% — ${audChg>0?'headwind':'tailwind'} to USD holdings (AMZN, SUI, PENGU).</li>`;
+            }
+            bullets += `<li>Move was ${movers.filter(h=>h.dayPnlAUD>0).length > movers.length/2 ? 'broad-based' : 'concentrated'}.</li>`;
+        } else {
+            bullets = '<li>Minimal movement. Portfolio is flat.</li>';
         }
+        document.getElementById('whyMovedList').innerHTML = bullets;
 
-        init();
+        // Contribution by holding
+        const sorted = [...S.holdings].sort((a,b)=>Math.abs(b.totalPnlAUD)-Math.abs(a.totalPnlAUD));
+        document.getElementById('contributionBody').innerHTML = sorted.map(h => {
+            const dc = totalDP !== 0 ? (h.dayPnlAUD/totalDP*100) : 0;
+            const st = classifyTechnical(h);
+            const cm = h.totalPnlAUD > 0 ? 'Portfolio driver' : h.totalPnlAUD < -500 ? 'Major drag' : h.totalPnlAUD < 0 ? 'Underperforming' : 'Flat';
+            return `<tr><td><strong>${h.ticker}</strong></td><td class="num">${fmtN(h.weight,1)}</td>
+                <td class="num ${clr(h.dayPnlAUD)}">${fmtC(h.dayPnlAUD,0)}</td><td class="num">${fmtN(dc,1)}%</td>
+                <td class="num ${clr(h.totalPnlAUD)}">${fmtC(h.totalPnlAUD,0)}</td><td class="num ${clr(h.returnPct)}">${fmtP(h.returnPct)}</td>
+                <td><span class="badge ${st.class}">${st.text}</span></td><td style="font-size:9px">${cm}</td></tr>`;
+        }).join('');
+
+        // By class
+        const cp = {};
+        S.holdings.forEach(h => { if(!cp[h.assetClass]) cp[h.assetClass]={d:0,t:0,w:0}; cp[h.assetClass].d+=h.dayPnlAUD; cp[h.assetClass].t+=h.totalPnlAUD; cp[h.assetClass].w+=h.weight; });
+        document.getElementById('classAttributionBody').innerHTML = Object.entries(cp).map(([c,d]) =>
+            `<tr><td><strong>${c}</strong></td><td class="num">${fmtN(d.w,1)}</td><td class="num ${clr(d.d)}">${fmtC(d.d,0)}</td><td class="num ${clr(d.t)}">${fmtC(d.t,0)}</td><td>${d.t>=0?'Outperforming cost':'Underperforming cost'}</td></tr>`
+        ).join('');
+
+        // By theme
+        const tp = {};
+        S.holdings.forEach(h => { if(!tp[h.theme]) tp[h.theme]={d:0,t:0,w:0}; tp[h.theme].d+=h.dayPnlAUD; tp[h.theme].t+=h.totalPnlAUD; tp[h.theme].w+=h.weight; });
+        document.getElementById('themeAttributionBody').innerHTML = Object.entries(tp).sort((a,b)=>Math.abs(b[1].t)-Math.abs(a[1].t)).map(([th,d]) =>
+            `<tr><td><strong>${th}</strong></td><td class="num">${fmtN(d.w,1)}</td><td class="num ${clr(d.d)}">${fmtC(d.d,0)}</td><td class="num ${clr(d.t)}">${fmtC(d.t,0)}</td><td>${d.t>=0?'Positive contributor':'Drag on portfolio'}</td></tr>`
+        ).join('');
+
+        // FX attribution
+        const usdH = S.holdings.filter(h=>h.currency==='USD');
+        const audChg = S.macroChanges['AUDUSD=X'];
+        if (usdH.length > 0 && audChg != null) {
+            const usdVal = usdH.reduce((s,h)=>s+h.marketValueAUD,0);
+            const fxImpact = usdVal * (-audChg/100);
+            document.getElementById('fxAttributionCard').innerHTML = `<p><strong>USD Exposure:</strong> ${usdH.map(h=>h.ticker).join(', ')} (${fmtC(usdVal,0)})</p>
+                <p><strong>AUD/USD Move:</strong> ${fmtP(audChg)} today</p>
+                <p><strong>FX Translation Effect:</strong> <span class="${clr(fxImpact)}">${fmtC(fxImpact,0)}</span> — ${audChg>0?'AUD strength headwind on USD positions':'AUD weakness tailwind on USD positions'}</p>`;
+        } else {
+            document.getElementById('fxAttributionCard').innerHTML = '<p>FX data unavailable.</p>';
+        }
+    }
+
+    function renderMacroView() {
+        const mp = S.macroPrices, mc = S.macroChanges;
+        const fmt = (sym,d=2) => mp[sym]!=null ? fmtN(mp[sym],d) : '--';
+        const fc = (sym) => mc[sym]!=null ? ` (${fmtP(mc[sym])})` : '';
+
+        document.getElementById('ind-sp500').textContent = fmt('^GSPC') + fc('^GSPC');
+        document.getElementById('ind-nasdaq').textContent = fmt('^IXIC') + fc('^IXIC');
+        document.getElementById('ind-vix').textContent = fmt('^VIX');
+        document.getElementById('ind-10y').textContent = fmt('^TNX') + '%';
+        document.getElementById('ind-2y').textContent = fmt('^FVX') + '%';
+        document.getElementById('ind-dxy').textContent = fmt('DX-Y.NYB') + fc('DX-Y.NYB');
+        document.getElementById('ind-gld').textContent = '$' + fmt('GLD') + fc('GLD');
+        document.getElementById('ind-tlt').textContent = '$' + fmt('TLT') + fc('TLT');
+        document.getElementById('ind-btc').textContent = 'A$' + (mp['BTC-AUD']!=null?Math.round(mp['BTC-AUD']).toLocaleString():'--') + fc('BTC-AUD');
+        document.getElementById('ind-audusd').textContent = fmt('AUDUSD=X',4);
+
+        // Dynamic macro mapping
+        const vix=mp['^VIX'], dxy=mp['DX-Y.NYB'], tnx=mp['^TNX'], dxyC=mc['DX-Y.NYB'], tnxC=mc['^TNX'];
+        const rows = [
+            { d:'DXY (USD Strength)', c:dxy!=null?`${fmtN(dxy)}${fc('DX-Y.NYB')}`:'--', sig:dxyC!=null?(dxyC>0.3?'USD Strengthening — HEADWIND':dxyC<-0.3?'USD Weakening — TAILWIND':'Flat'):'--', h:'BTC, SOL, ETH, SUI (inverse USD)', imp:dxyC!=null?(dxyC>0?'Negative — strong USD pressures crypto':'Positive — weak USD supports risk'):'--' },
+            { d:'10Y Yield', c:tnx!=null?`${fmtN(tnx)}%${fc('^TNX')}`:'--', sig:tnx!=null?(tnx>4.5?'Yields elevated — growth discount':tnx<3.5?'Yields low — growth friendly':'Neutral'):'--', h:'AMZN (duration-sensitive growth)', imp:tnxC!=null?(tnxC>0?'Negative for AMZN multiples':'Positive for AMZN'):'--' },
+            { d:'VIX', c:vix!=null?fmtN(vix):'--', sig:vix!=null?(vix>25?'Elevated — risk-off':vix<16?'Low — complacency':'Moderate'):'--', h:'All — vol regime', imp:vix!=null?(vix>25?'Risk-off: crypto highly vulnerable':vix<16?'Risk-on but watch for vol spike':'Normal conditions'):'--' },
+            { d:'HYG (Credit)', c:mp['HYG']!=null?`$${fmtN(mp['HYG'])}${fc('HYG')}`:'--', sig:mc['HYG']!=null?(mc['HYG']>0?'Credit healthy':'Credit stress'):'--', h:'Portfolio-wide risk appetite', imp:mc['HYG']!=null?(mc['HYG']<-0.3?'Warning — credit weakness precedes selloffs':'Supportive'):'--' },
+            { d:'AUD/USD', c:fmt('AUDUSD=X',4), sig:mc['AUDUSD=X']!=null?(mc['AUDUSD=X']>0?'AUD strengthening':'AUD weakening'):'--', h:'AMZN, SUI, PENGU (USD-denom)', imp:mc['AUDUSD=X']!=null?(mc['AUDUSD=X']>0?'Headwind on USD positions':'Tailwind on USD positions'):'--' },
+        ];
+        document.getElementById('macroMappingBody').innerHTML = rows.map(r =>
+            `<tr><td><strong>${r.d}</strong></td><td>${r.c}</td><td>${r.sig}</td><td style="font-size:9px">${r.h}</td><td style="font-size:9px">${r.imp}</td></tr>`
+        ).join('');
+    }
+
+    function renderBenchmarkView() {
+        document.getElementById('blendedBenchmarkCard').innerHTML = `<p><strong>ASSUMED BLENDED BENCHMARK</strong> — No explicit benchmark provided. Derived from portfolio sleeve weights:</p>
+            <p style="margin-top:6px">40% BTC (Core Crypto) + 25% SPY (US Equities) + 10% SOL (Satellite) + 5% DOGE (Speculative) + 20% Cash (SHV)</p>
+            <p style="margin-top:6px;color:var(--text-muted)">Benchmark returns require historical data. Showing directional day-change analysis.</p>`;
+
+        const sleeves = [
+            { name: 'Core Crypto (SOL/ETH)', bench: 'BTC-AUD', hk: ['SOL','ETH'] },
+            { name: 'US Equities (AMZN)', bench: '^GSPC', hk: ['AMZN'] },
+            { name: 'Satellite (SUI)', bench: 'SOL-AUD', hk: ['SUI'] },
+            { name: 'Speculative (DOGE/PENGU)', bench: 'DOGE-AUD', hk: ['DOGE','PENGU'] },
+        ];
+        document.getElementById('sleeveBenchmarkBody').innerHTML = sleeves.map(sl => {
+            const sH = S.holdings.filter(h=>sl.hk.includes(h.ticker));
+            const sV = sH.reduce((s,h)=>s+h.marketValueAUD,0);
+            const sDP = sH.reduce((s,h)=>s+h.dayPnlAUD,0);
+            const sPct = sV>0?(sDP/sV*100):0;
+            const bChg = S.macroChanges[sl.bench] ?? S.changes[sl.bench];
+            const alpha = bChg!=null?sPct-bChg:null;
+            const interp = alpha!=null?(alpha>0?'Positive selection effect':'Negative selection effect'):'Benchmark unavailable';
+            return `<tr><td><strong>${sl.name}</strong></td><td>${sl.bench}</td><td class="num">${fmtP(sPct)}</td><td class="num">${bChg!=null?fmtP(bChg):'--'}</td>
+                <td class="num ${alpha!=null?clr(alpha):''}">${alpha!=null?fmtP(alpha):'--'}</td><td style="font-size:9px">${interp}</td></tr>`;
+        }).join('');
+
+        const cW = S.holdings.filter(h=>h.assetClass==='Crypto').reduce((s,h)=>s+h.weight,0);
+        const uW = S.holdings.filter(h=>h.currency==='USD').reduce((s,h)=>s+h.weight/100,0);
+        document.getElementById('performanceAttribution').innerHTML = `
+            <p><strong>Allocation Effect:</strong> ${fmtN(cW,0)}% crypto vs 25% equity tilts portfolio toward crypto beta. Underperformance vs blended benchmark = overweight crypto during weakness.</p>
+            <p style="margin-top:6px"><strong>Selection Effect:</strong> Concentration in SOL/ETH (L1 infra) vs BTC benchmark = amplified alt narrative. Outperforms when alts lead, underperforms when BTC dominates.</p>
+            <p style="margin-top:6px"><strong>FX Effect:</strong> ${fmtN(uW*100,0)}% USD exposure. 1% AUD move = ~${fmtC(S.totalValue*uW*0.01,0)} impact.</p>`;
+    }
+
+    function renderPlaybookView() {
+        const actions = [];
+        const sorted = [...S.holdings].sort((a,b)=>b.marketValueAUD-a.marketValueAUD);
+        sorted.forEach(h => {
+            const act = computeAction(h);
+            if (act === 'HOLD') return;
+            const t = POSITION_TARGETS[h.ticker]||0, d = (h.weight/100)-t, trimA = d>0?d*S.totalValue:0;
+            let pri,src,rat,rsk;
+            if (act==='EXIT') { pri='URGENT'; src='Liquidate'; rat=h.ticker==='PENGU'?'Invalidated thesis, dead money. Recycle proceeds.':'Broken, low conviction. Exit.'; rsk='Minimal'; }
+            else if (act==='TRIM') { pri=h.conviction==='low'?'HIGH':'MEDIUM'; src='Rebalance to Cash'; rat=`Overweight ${fmtP(d*100)}. ${h.conviction==='low'?'Low conviction — reduce.':'Trim to target.'}`; rsk='May miss upside'; }
+            else if (act==='ADD') { pri='MEDIUM'; src='New cash / proceeds'; rat=`Underweight ${fmtP(Math.abs(d)*100)}. Bullish trend.`; rsk='Adding before pullback'; }
+            else { pri='WATCHLIST'; src='Monitor'; rat='Core under pressure. Thesis intact.'; rsk='Averaging into damage'; }
+            actions.push({ pri, tk: h.ticker, act, sz: act==='EXIT'?h.marketValueAUD:trimA, src, rat, rsk });
+        });
+        sorted.forEach(h => { if (computeAction(h)==='HOLD') actions.push({ pri:'HOLD', tk:h.ticker, act:'HOLD', sz:0, src:'N/A', rat:'Within target, thesis intact', rsk:'Ongoing' }); });
+        if (CASH_BALANCE===0) actions.push({ pri:'HIGH', tk:'CASH', act:'BUILD BUFFER', sz:S.totalValue*0.15, src:'EXIT+TRIM proceeds', rat:`Zero cash. Target 15-20% reserve (${fmtC(S.totalValue*0.15,0)}-${fmtC(S.totalValue*0.2,0)}).`, rsk:'Opportunity cost' });
+
+        const po = { URGENT:0, HIGH:1, MEDIUM:2, WATCHLIST:3, HOLD:4 };
+        actions.sort((a,b)=>(po[a.pri]??5)-(po[b.pri]??5));
+
+        document.getElementById('actionQueueBody').innerHTML = actions.map(a => {
+            const pc = a.pri==='URGENT'?'badge-severe':a.pri==='HIGH'?'badge-elevated':a.pri==='MEDIUM'?'badge-blue':'badge-neutral';
+            const ac = a.act==='EXIT'?'badge-severe':a.act==='TRIM'?'badge-elevated':a.act==='ADD'?'badge-bullish':a.act==='WATCH'?'badge-blue':'badge-neutral';
+            return `<tr><td><span class="badge ${pc}">${a.pri}</span></td><td><strong>${a.tk}</strong></td><td><span class="badge ${ac}">${a.act}</span></td>
+                <td class="num">${a.sz>0?fmtC(a.sz,0):'—'}</td><td style="font-size:9px">${a.src}</td><td style="font-size:9px">${a.rat}</td><td style="font-size:9px">${a.rsk}</td></tr>`;
+        }).join('');
+
+        // Thesis
+        document.getElementById('thesisBody').innerHTML = S.holdings.map(h => {
+            const t = THESIS_DATA[h.ticker]||{};
+            const ts = h.ticker==='PENGU'?'INVALIDATED':h.ticker==='DOGE'?'QUESTIONABLE':h.ticker==='SUI'?'WATCHFUL':'INTACT';
+            const tc = ts==='INTACT'?'badge-bullish':ts==='QUESTIONABLE'?'badge-neutral':ts==='INVALIDATED'?'badge-severe':'badge-elevated';
+            return `<tr><td><strong>${h.ticker}</strong></td><td style="font-size:9px">${t.thesis||'INFERRED'}</td><td><span class="badge ${tc}">${ts}</span></td>
+                <td style="font-size:9px">${t.addOn||'--'}</td><td style="font-size:9px">${t.trimOn||'--'}</td>
+                <td style="font-size:9px">${t.invalidation||'--'}</td><td style="font-size:9px">${t.catalyst||'--'}</td></tr>`;
+        }).join('');
+
+        // Catalysts
+        document.getElementById('catalystCards').innerHTML = CATALYSTS.map(c =>
+            `<div class="catalyst-card"><div class="catalyst-header"><span class="catalyst-event">${c.event}</span><span class="catalyst-timing">${c.timing}</span></div>
+            <div class="catalyst-body"><strong>Exposed:</strong> ${c.holdings.join(', ')}<br><span class="text-positive">Bull:</span> ${c.bullish}<br><span class="text-negative">Bear:</span> ${c.bearish}</div></div>`
+        ).join('');
+    }
+
+    function renderAll() { renderPortfolioView(); renderRiskView(); renderAttributionView(); renderMacroView(); renderBenchmarkView(); renderPlaybookView(); }
+
+    // ==================== VIEW SWITCHING ====================
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            tab.classList.add('active');
+            const v = document.querySelector(`.view[data-view="${tab.dataset.view}"]`);
+            if (v) v.classList.add('active');
+        });
+    });
+
+    // ==================== INIT ====================
+    document.getElementById('refreshBtn').addEventListener('click', fetchPrices);
+    document.getElementById('generateMacroBtn').addEventListener('click', fetchMacroBriefing);
+    setInterval(() => { document.getElementById('timestamp').textContent = new Date().toTimeString().slice(0,8); }, 1000);
+    updateStatusBar();
+    fetchPrices();
     </script>
 </body>
 </html>
