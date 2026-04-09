@@ -1656,7 +1656,8 @@
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 
                 tab.classList.add('active');
-                document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+                const viewEl = document.querySelector(`.view[data-view="${viewName}"]`) || document.getElementById(`${viewName}View`);
+                if (viewEl) viewEl.classList.add('active');
             });
         });
 
