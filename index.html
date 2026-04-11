@@ -1055,34 +1055,255 @@
             <p style="margin-top:6px"><strong>FX Effect:</strong> ${fmtN(uW*100,0)}% USD exposure. 1% AUD move = ~${fmtC(S.totalValue*uW*0.01,0)} impact.</p>`;
     }
 
-    function renderPlaybookView() {
-        const actions = [];
-        const sorted = [...S.holdings].sort((a,b)=>b.marketValueAUD-a.marketValueAUD);
-        sorted.forEach(h => {
-            const act = computeAction(h);
-            if (act === 'HOLD') return;
-            const t = POSITION_TARGETS[h.ticker]||0, d = (h.weight/100)-t, trimA = d>0?d*S.totalValue:0;
-            let pri,src,rat,rsk;
-            if (act==='EXIT') { pri='URGENT'; src='Liquidate'; rat=h.ticker==='PENGU'?'Invalidated thesis, dead money. Recycle proceeds.':'Broken, low conviction. Exit.'; rsk='Minimal'; }
-            else if (act==='TRIM') { pri=h.conviction==='low'?'HIGH':'MEDIUM'; src='Rebalance to Cash'; rat=`Overweight ${fmtP(d*100)}. ${h.conviction==='low'?'Low conviction — reduce.':'Trim to target.'}`; rsk='May miss upside'; }
-            else if (act==='ADD') { pri='MEDIUM'; src='New cash / proceeds'; rat=`Underweight ${fmtP(Math.abs(d)*100)}. Bullish trend.`; rsk='Adding before pullback'; }
-            else { pri='WATCHLIST'; src='Monitor'; rat='Core under pressure. Thesis intact.'; rsk='Averaging into damage'; }
-            actions.push({ pri, tk: h.ticker, act, sz: act==='EXIT'?h.marketValueAUD:trimA, src, rat, rsk });
+    // ==================== PLAYBOOK RULES ENGINE ====================
+    // 10 rules, balanced aggression — pragmatic not punchy. Each rule can emit
+    // one or more actions with { priority, type, ticker, sizeAUD, sizePct,
+    // reason, sources[], confidence, deadline }. Actions are then ranked by
+    // priority (desc) and rendered as cards.
+    //
+    // Priority scale: 1-10 (10 = do-this-now, 1 = watchlist only)
+    // Type: EXIT | TRIM | ADD | REBALANCE | HEDGE | WATCH | CASH
+    function generatePlaybookActions() {
+        const out = [];
+        const tv = S.totalValue || 0;
+        if (!tv) return out;
+
+        const push = (a) => out.push(a);
+        const pctSize = (aud) => tv > 0 ? (aud / tv) * 100 : 0;
+
+        // Helper: find macro instrument change
+        const macro = (k) => S.macroInstruments[k]?.changePct;
+        const vixChg = macro('VIXY');
+        const spyChg = macro('SPY');
+        const hygChg = macro('HYG');
+
+        // Pre-compute holding context
+        const ctx = S.holdings.map(h => {
+            const status = classifyTechnical(h);
+            const target = (POSITION_TARGETS[h.ticker] || 0) * 100;
+            const driftPct = h.weight - target;
+            const driftAUD = (driftPct / 100) * tv;
+            return { h, status, target, driftPct, driftAUD };
         });
-        sorted.forEach(h => { if (computeAction(h)==='HOLD') actions.push({ pri:'HOLD', tk:h.ticker, act:'HOLD', sz:0, src:'N/A', rat:'Within target, thesis intact', rsk:'Ongoing' }); });
-        if (CASH_BALANCE===0) actions.push({ pri:'HIGH', tk:'CASH', act:'BUILD BUFFER', sz:S.totalValue*0.15, src:'EXIT+TRIM proceeds', rat:`Zero cash. Target 15-20% reserve (${fmtC(S.totalValue*0.15,0)}-${fmtC(S.totalValue*0.2,0)}).`, rsk:'Opportunity cost' });
 
-        const po = { URGENT:0, HIGH:1, MEDIUM:2, WATCHLIST:3, HOLD:4 };
-        actions.sort((a,b)=>(po[a.pri]??5)-(po[b.pri]??5));
+        // -------- Rule 1: EXIT invalidated / broken speculative (priority 10) --------
+        ctx.forEach(({ h, status }) => {
+            if (h.ticker === 'PENGU') {
+                push({
+                    priority: 10, type: 'EXIT', ticker: h.ticker,
+                    sizeAUD: h.marketValueAUD, sizePct: pctSize(h.marketValueAUD),
+                    reason: 'Thesis invalidated — speculative NFT exposure with zero fundamental support. Recycle proceeds into cash reserve or oversold quality.',
+                    sources: ['Thesis', 'Conviction'],
+                    confidence: 95,
+                    deadline: 'This week',
+                });
+                return;
+            }
+            if ((status.text === 'DEAD MONEY' || status.text === 'BLEEDING') && h.conviction === 'low' && h.positionType === 'speculative') {
+                push({
+                    priority: 9, type: 'EXIT', ticker: h.ticker,
+                    sizeAUD: h.marketValueAUD, sizePct: pctSize(h.marketValueAUD),
+                    reason: `${status.text} + low conviction. Stop the bleeding — close position and redeploy.`,
+                    sources: ['Technicals', 'Conviction'],
+                    confidence: 80,
+                    deadline: 'Next 2 weeks',
+                });
+            }
+        });
 
-        document.getElementById('actionQueueBody').innerHTML = actions.map(a => {
-            const pc = a.pri==='URGENT'?'badge-severe':a.pri==='HIGH'?'badge-elevated':a.pri==='MEDIUM'?'badge-blue':'badge-neutral';
-            const ac = a.act==='EXIT'?'badge-severe':a.act==='TRIM'?'badge-elevated':a.act==='ADD'?'badge-bullish':a.act==='WATCH'?'badge-blue':'badge-neutral';
-            return `<tr><td><span class="badge ${pc}">${a.pri}</span></td><td><strong>${a.tk}</strong></td><td><span class="badge ${ac}">${a.act}</span></td>
-                <td class="num">${a.sz>0?fmtC(a.sz,0):'—'}</td><td style="font-size:9px">${a.src}</td><td style="font-size:9px">${a.rat}</td><td style="font-size:9px">${a.rsk}</td></tr>`;
-        }).join('');
+        // -------- Rule 2: TRIM frothy overweight (priority 8) --------
+        ctx.forEach(({ h, status, driftPct, driftAUD }) => {
+            if (status.text === 'FROTHY' && driftPct > 3) {
+                const trimAUD = driftAUD * 0.6; // pragmatic — take some off, not all
+                push({
+                    priority: 8, type: 'TRIM', ticker: h.ticker,
+                    sizeAUD: trimAUD, sizePct: pctSize(trimAUD),
+                    reason: `Frothy (RSI>80, extended above 50D) and overweight by ${fmtP(driftPct,1)}. Take partial profit, keep core exposure.`,
+                    sources: ['Technicals', 'Drift'],
+                    confidence: 75,
+                    deadline: 'Next 2 weeks',
+                });
+            }
+        });
 
-        // Thesis
+        // -------- Rule 3: TRIM on-a-tear high-drift (priority 7) --------
+        ctx.forEach(({ h, status, driftPct, driftAUD }) => {
+            if (status.text === 'ON A TEAR' && driftPct > 5) {
+                const trimAUD = driftAUD * 0.5;
+                push({
+                    priority: 7, type: 'TRIM', ticker: h.ticker,
+                    sizeAUD: trimAUD, sizePct: pctSize(trimAUD),
+                    reason: `Runner is extended and now ${fmtP(driftPct,1)} overweight. Pragmatic: lock in half the drift, let the rest run.`,
+                    sources: ['Technicals', 'Drift'],
+                    confidence: 70,
+                    deadline: 'Next 2 weeks',
+                });
+            }
+        });
+
+        // -------- Rule 4: ADD oversold high-conviction underweight (priority 8) --------
+        ctx.forEach(({ h, status, driftPct, driftAUD }) => {
+            if (status.text === 'OVERSOLD' && h.conviction === 'high' && driftPct < -3) {
+                const addAUD = Math.abs(driftAUD) * 0.5;
+                push({
+                    priority: 8, type: 'ADD', ticker: h.ticker,
+                    sizeAUD: addAUD, sizePct: pctSize(addAUD),
+                    reason: `Oversold (RSI<30) + high conviction + underweight ${fmtP(driftPct,1)}. Scale in half-size — don't catch a falling knife.`,
+                    sources: ['Technicals', 'Conviction', 'Drift'],
+                    confidence: 65,
+                    deadline: 'This month',
+                });
+            }
+        });
+
+        // -------- Rule 5: REBALANCE position drift (priority 6) --------
+        ctx.forEach(({ h, status, driftPct, driftAUD }) => {
+            // Only flag drift not already handled by rules 2/3/4
+            const alreadyActioned = out.some(a => a.ticker === h.ticker && a.type !== 'WATCH');
+            if (alreadyActioned) return;
+            if (Math.abs(driftPct) >= 5) {
+                const side = driftPct > 0 ? 'TRIM' : 'ADD';
+                const sz = Math.abs(driftAUD) * 0.6;
+                push({
+                    priority: 6, type: 'REBALANCE', ticker: h.ticker,
+                    sizeAUD: sz, sizePct: pctSize(sz),
+                    reason: `${fmtP(driftPct,1)} off target (${fmtN(h.weight,1)}% vs ${fmtN((POSITION_TARGETS[h.ticker]||0)*100,0)}%). ${side} toward target — mechanical rebalance, no thesis change required.`,
+                    sources: ['Drift'],
+                    confidence: 60,
+                    deadline: 'Next 4 weeks',
+                });
+            }
+        });
+
+        // -------- Rule 6: ADD bullish underweight with trend (priority 5) --------
+        ctx.forEach(({ h, status, driftPct, driftAUD }) => {
+            const alreadyActioned = out.some(a => a.ticker === h.ticker && a.type !== 'WATCH');
+            if (alreadyActioned) return;
+            if (status.text === 'BULLISH' && driftPct < -3 && h.conviction !== 'low') {
+                const addAUD = Math.abs(driftAUD) * 0.5;
+                push({
+                    priority: 5, type: 'ADD', ticker: h.ticker,
+                    sizeAUD: addAUD, sizePct: pctSize(addAUD),
+                    reason: `Bullish trend + underweight ${fmtP(driftPct,1)}. Scale in over 2-3 tranches, not at the high.`,
+                    sources: ['Technicals', 'Drift'],
+                    confidence: 55,
+                    deadline: 'Next month',
+                });
+            }
+        });
+
+        // -------- Rule 7: HEDGE low-vol high-beta warning (priority 4) --------
+        if (vixChg != null && vixChg < -8 && S.holdings.some(h => h.assetClass === 'Crypto' && h.weight > 25)) {
+            // Vol is compressing hard while crypto is heavily weighted — warning, not panic
+            push({
+                priority: 4, type: 'HEDGE', ticker: 'VIX/SPY',
+                sizeAUD: 0, sizePct: 0,
+                reason: `Vol compressed ${fmtP(vixChg,1)} today into a 70%+ crypto book. Consider a small SPY put hedge or increase cash — mean reversion risk building.`,
+                sources: ['Macro', 'Regime'],
+                confidence: 50,
+                deadline: 'This month',
+            });
+        }
+
+        // -------- Rule 8: BUILD CASH buffer (priority 8) --------
+        if (CASH_BALANCE === 0) {
+            const targetCash = tv * 0.15;
+            push({
+                priority: 8, type: 'CASH', ticker: 'CASH',
+                sizeAUD: targetCash, sizePct: 15,
+                reason: `Zero cash reserve against ${fmtC(tv,0)} book. Build 15% buffer from EXIT/TRIM proceeds — dry powder for drawdowns and opportunities.`,
+                sources: ['Risk', 'Hygiene'],
+                confidence: 85,
+                deadline: 'Next 4 weeks',
+            });
+        }
+
+        // -------- Rule 9: Concentration reduce (priority 7) --------
+        const top = [...S.holdings].sort((a,b)=>b.weight-a.weight)[0];
+        if (top && top.weight > 40) {
+            const alreadyTrim = out.some(a => a.ticker === top.ticker && (a.type === 'TRIM' || a.type === 'EXIT'));
+            if (!alreadyTrim) {
+                const excessAUD = ((top.weight - 35) / 100) * tv;
+                push({
+                    priority: 7, type: 'TRIM', ticker: top.ticker,
+                    sizeAUD: excessAUD, sizePct: pctSize(excessAUD),
+                    reason: `${top.ticker} at ${fmtN(top.weight,1)}% is concentration risk — any single-name shock cripples the book. Trim toward 35% ceiling.`,
+                    sources: ['Risk'],
+                    confidence: 70,
+                    deadline: 'Next 4 weeks',
+                });
+            }
+        }
+
+        // -------- Rule 10: THESIS WATCH — questionable but not acted (priority 3) --------
+        ctx.forEach(({ h }) => {
+            const alreadyActioned = out.some(a => a.ticker === h.ticker);
+            if (alreadyActioned) return;
+            if (h.ticker === 'DOGE' || h.ticker === 'SUI') {
+                push({
+                    priority: 3, type: 'WATCH', ticker: h.ticker,
+                    sizeAUD: 0, sizePct: 0,
+                    reason: h.ticker === 'DOGE'
+                        ? 'Meme/speculative — no fundamental support. Not urgent, but any 20%+ rally is a trim signal.'
+                        : 'Satellite L1 bet — watch ecosystem adoption metrics. Trim if breaks above USD$8 or doubles from cost.',
+                    sources: ['Thesis'],
+                    confidence: 50,
+                    deadline: 'Monitor',
+                });
+            }
+        });
+
+        // Rank by priority desc then confidence desc
+        out.sort((a,b) => (b.priority - a.priority) || (b.confidence - a.confidence));
+        return out;
+    }
+
+    function renderPlaybookView() {
+        const actions = generatePlaybookActions();
+
+        // ---- Banner ----
+        const urgent = actions.filter(a => a.priority >= 8).length;
+        const rebalanceSize = actions
+            .filter(a => a.type === 'TRIM' || a.type === 'EXIT' || a.type === 'ADD' || a.type === 'REBALANCE')
+            .reduce((s, a) => s + Math.abs(a.sizeAUD || 0), 0);
+        document.getElementById('pbRegime').textContent = S.regime;
+        document.getElementById('pbOpenCount').textContent = actions.length;
+        document.getElementById('pbUrgentCount').textContent = urgent;
+        document.getElementById('pbRebalanceSize').textContent = fmtC(rebalanceSize, 0);
+        document.getElementById('pbCashTarget').textContent = fmtC((S.totalValue || 0) * 0.15, 0);
+
+        // ---- Action cards ----
+        const cardList = document.getElementById('actionCardList');
+        if (!actions.length) {
+            cardList.innerHTML = '<p style="color:var(--text-muted)">No actions generated. Click REFRESH PRICES to load holdings data.</p>';
+        } else {
+            cardList.innerHTML = actions.map((a, i) => {
+                const urgencyClass = a.priority >= 9 ? 'urgent' : a.priority >= 7 ? 'high' : a.priority >= 5 ? 'med' : a.priority >= 3 ? 'low' : 'watch';
+                const sizeBlock = a.sizeAUD > 0
+                    ? `<div style="text-align:right"><div class="action-card-size">${fmtC(a.sizeAUD, 0)}</div><div class="action-card-size-pct">${fmtN(a.sizePct, 1)}% of book</div></div>`
+                    : `<div style="text-align:right"><div class="action-card-size" style="color:var(--text-muted)">—</div></div>`;
+                const sources = (a.sources || []).map(s => `<span class="badge badge-neutral" style="font-size:8px; padding:1px 5px">${s}</span>`).join(' ');
+                return `<div class="action-card ${urgencyClass}">
+                    <div class="action-card-top">
+                        <div class="action-card-left">
+                            <span class="action-card-rank">#${i + 1}</span>
+                            <span class="action-card-ticker">${a.ticker}</span>
+                            <span class="action-card-type ${a.type}">${a.type}</span>
+                        </div>
+                        ${sizeBlock}
+                    </div>
+                    <div class="action-card-reason">${a.reason}</div>
+                    <div class="action-card-meta">
+                        <span>Priority ${a.priority}/10</span>
+                        <span>Confidence ${a.confidence}%</span>
+                        <span>By ${a.deadline}</span>
+                        <span class="action-card-sources">${sources}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ---- Thesis monitor ----
         document.getElementById('thesisBody').innerHTML = S.holdings.map(h => {
             const t = THESIS_DATA[h.ticker]||{};
             const ts = h.ticker==='PENGU'?'INVALIDATED':h.ticker==='DOGE'?'QUESTIONABLE':h.ticker==='SUI'?'WATCHFUL':'INTACT';
@@ -1092,7 +1313,7 @@
                 <td style="font-size:9px">${t.invalidation||'--'}</td><td style="font-size:9px">${t.catalyst||'--'}</td></tr>`;
         }).join('');
 
-        // Catalysts
+        // ---- Catalysts ----
         document.getElementById('catalystCards').innerHTML = CATALYSTS.map(c =>
             `<div class="catalyst-card"><div class="catalyst-header"><span class="catalyst-event">${c.event}</span><span class="catalyst-timing">${c.timing}</span></div>
             <div class="catalyst-body"><strong>Exposed:</strong> ${c.holdings.join(', ')}<br><span class="text-positive">Bull:</span> ${c.bullish}<br><span class="text-negative">Bear:</span> ${c.bearish}</div></div>`
@@ -1113,11 +1334,22 @@
     });
 
     // ==================== INIT ====================
+    // Manual-refresh only. No auto-fetch on page load — user asked for
+    // click-to-refresh to avoid hammering the free-tier APIs.
     document.getElementById('refreshBtn').addEventListener('click', fetchPrices);
-    document.getElementById('generateMacroBtn').addEventListener('click', fetchMacroBriefing);
+
+    // LOAD MACRO button loads the Tier 1 core 20 instruments (no briefing)
+    document.getElementById('loadMacroBtn').addEventListener('click', () => fetchMacro(['tier1'], false));
+
+    // GENERATE BRIEFING fetches Tier 1 + AI briefing in a single call
+    document.getElementById('generateMacroBtn').addEventListener('click', () => fetchMacro(['tier1'], true));
+
     setInterval(() => { document.getElementById('timestamp').textContent = new Date().toTimeString().slice(0,8); }, 1000);
     updateStatusBar();
-    fetchPrices();
+
+    // Render empty-state views so the UI isn't blank before first fetch
+    recalculate();
+    renderAll();
     </script>
 </body>
 </html>
