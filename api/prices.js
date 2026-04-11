@@ -1,21 +1,48 @@
 /**
  * Vercel Serverless Function — /api/prices
- * POST { symbols: string[], technicals?: string[] } → { prices, changes, technicals }
+ * POST { symbols: string[], technicals?: string[] } → { prices, changes, extras, technicals }
  *
- * technicals array requests 50D SMA, RSI, 52W high/low, 1M ROC for those symbols.
+ * Data sources:
+ *   - CoinGecko (free, no key blocking) for all crypto
+ *   - Finnhub (requires FINNHUB_API_KEY env var) for equities + FX
+ *
+ * Backwards-compatible with the old Yahoo-style symbol names used in index.html:
+ *   SOL-AUD, ETH-AUD, DOGE-AUD, SUI20947-USD, PENGU28905-USD, AMZN, AUDUSD=X
  */
 const https = require('https');
 
-const YF_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Accept': 'application/json',
-  'Origin': 'https://finance.yahoo.com',
-  'Referer': 'https://finance.yahoo.com/',
+const FINNHUB_KEY = process.env.FINNHUB_API_KEY || '';
+
+// Symbol → data source mapping
+// `id` is the CoinGecko coin id or the Finnhub symbol/forex pair
+const SYMBOL_MAP = {
+  // Crypto — all priced in AUD directly via CoinGecko
+  'SOL-AUD':        { source: 'coingecko', id: 'solana',         vs: 'aud' },
+  'ETH-AUD':        { source: 'coingecko', id: 'ethereum',       vs: 'aud' },
+  'DOGE-AUD':       { source: 'coingecko', id: 'dogecoin',       vs: 'aud' },
+  'SUI20947-USD':   { source: 'coingecko', id: 'sui',            vs: 'aud' },
+  'PENGU28905-USD': { source: 'coingecko', id: 'pudgy-penguins', vs: 'aud' },
+  'BTC-AUD':        { source: 'coingecko', id: 'bitcoin',        vs: 'aud' },
+  'ETH-USD':        { source: 'coingecko', id: 'ethereum',       vs: 'usd' },
+  'BTC-USD':        { source: 'coingecko', id: 'bitcoin',        vs: 'usd' },
+
+  // US equities + ETFs via Finnhub
+  'AMZN':   { source: 'finnhub', id: 'AMZN' },
+
+  // FX — Finnhub forex or inverse of USD/AUD
+  'AUDUSD=X': { source: 'finnhub-fx', id: 'OANDA:AUD_USD' },
 };
 
-function fetchJSON(url) {
+// ---------- HTTP helper ----------
+function fetchJSON(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: YF_HEADERS }, (res) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'PortfolioOS/1.0',
+        'Accept': 'application/json',
+        ...headers,
+      },
+    }, (res) => {
       let d = '';
       res.on('data', c => d += c);
       res.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
@@ -23,74 +50,90 @@ function fetchJSON(url) {
   });
 }
 
-async function fetchQuotes(symbols) {
-  const qs = symbols.map(encodeURIComponent).join('%2C');
-  const fields = [
-    'regularMarketPrice', 'regularMarketChangePercent', 'regularMarketPreviousClose',
-    'fiftyDayAverage', 'twoHundredDayAverage', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow',
-    'symbol'
-  ].join('%2C');
-  const url = `https://query2.finance.yahoo.com/v8/finance/quote?symbols=${qs}&fields=${fields}`;
-
+// ---------- CoinGecko ----------
+/**
+ * Batch fetch simple prices + 24h change for multiple CoinGecko ids.
+ * Returns { id: { aud: price, aud_24h_change: pct } }
+ */
+async function fetchCoinGeckoPrices(ids, vs = 'aud') {
+  if (!ids.length) return {};
+  const idsParam = ids.join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsParam}&vs_currencies=${vs}&include_24hr_change=true`;
   try {
-    const data = await fetchJSON(url);
-    const results = data?.quoteResponse?.result || [];
-    const prices = {}, changes = {}, extras = {};
-
-    results.forEach(q => {
-      const sym = q.symbol;
-      prices[sym] = q.regularMarketPrice ?? null;
-      changes[sym] = q.regularMarketChangePercent ?? null;
-      extras[sym] = {
-        prevClose: q.regularMarketPreviousClose ?? null,
-        fiftyDayAvg: q.fiftyDayAverage ?? null,
-        twoHundredDayAvg: q.twoHundredDayAverage ?? null,
-        fiftyTwoWeekHigh: q.fiftyTwoWeekHigh ?? null,
-        fiftyTwoWeekLow: q.fiftyTwoWeekLow ?? null,
-      };
-    });
-
-    return { prices, changes, extras };
+    return await fetchJSON(url);
   } catch (e) {
-    return { prices: {}, changes: {}, extras: {} };
+    console.error('CoinGecko fetch failed:', e.message);
+    return {};
   }
 }
 
 /**
- * Fetch chart data for RSI and 1M ROC calculation
- * Uses 3-month daily data to compute 14-day RSI and 1-month rate of change
+ * Fetch 90-day daily market chart for a CoinGecko id to compute technicals.
+ * Returns array of daily closes (most recent last).
  */
-async function fetchTechnicals(symbol) {
-  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=3mo&interval=1d`;
+async function fetchCoinGeckoCandles(id, vs = 'aud', days = 90) {
+  const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=${vs}&days=${days}&interval=daily`;
   try {
     const data = await fetchJSON(url);
-    const result = data?.chart?.result?.[0];
-    if (!result) return null;
+    const prices = data?.prices || [];
+    return prices.map(p => p[1]).filter(p => p != null);
+  } catch (e) {
+    console.error(`CoinGecko candles failed for ${id}:`, e.message);
+    return [];
+  }
+}
 
-    const closes = result.indicators?.quote?.[0]?.close?.filter(c => c != null) || [];
-    if (closes.length < 15) return null;
-
-    // 14-day RSI
-    const rsi = calcRSI(closes, 14);
-
-    // 1M ROC (approx 21 trading days)
-    const lookback = Math.min(21, closes.length - 1);
-    const oldPrice = closes[closes.length - 1 - lookback];
-    const newPrice = closes[closes.length - 1];
-    const roc1m = oldPrice > 0 ? ((newPrice - oldPrice) / oldPrice) * 100 : null;
-
-    // 50D SMA from closes
-    const sma50 = closes.length >= 50
-      ? closes.slice(-50).reduce((s, v) => s + v, 0) / 50
-      : null;
-
-    return { rsi, roc1m, sma50 };
-  } catch {
+// ---------- Finnhub ----------
+async function fetchFinnhubQuote(symbol) {
+  if (!FINNHUB_KEY) return null;
+  const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`;
+  try {
+    const data = await fetchJSON(url);
+    // Finnhub returns: { c, d, dp, h, l, o, pc, t }
+    if (data && typeof data.c === 'number' && data.c > 0) {
+      return {
+        price: data.c,
+        changePct: data.dp,
+        prevClose: data.pc,
+        high: data.h,
+        low: data.l,
+        open: data.o,
+      };
+    }
+    return null;
+  } catch (e) {
+    console.error(`Finnhub quote failed for ${symbol}:`, e.message);
     return null;
   }
 }
 
-function calcRSI(closes, period) {
+async function fetchFinnhubForex(pair) {
+  if (!FINNHUB_KEY) return null;
+  // Finnhub forex quote: use /quote with symbol like 'OANDA:AUD_USD'
+  return fetchFinnhubQuote(pair);
+}
+
+/**
+ * Fetch daily candles for a Finnhub symbol to compute technicals.
+ * Returns array of closes (most recent last).
+ */
+async function fetchFinnhubCandles(symbol, days = 90) {
+  if (!FINNHUB_KEY) return [];
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - days * 24 * 60 * 60;
+  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
+  try {
+    const data = await fetchJSON(url);
+    if (data && data.s === 'ok' && Array.isArray(data.c)) return data.c;
+    return [];
+  } catch (e) {
+    console.error(`Finnhub candles failed for ${symbol}:`, e.message);
+    return [];
+  }
+}
+
+// ---------- Technical indicators ----------
+function calcRSI(closes, period = 14) {
   if (closes.length < period + 1) return null;
   let gains = 0, losses = 0;
   for (let i = closes.length - period; i < closes.length; i++) {
@@ -105,6 +148,22 @@ function calcRSI(closes, period) {
   return 100 - (100 / (1 + rs));
 }
 
+function computeTechnicals(closes) {
+  if (!closes || closes.length < 15) return null;
+  const rsi = calcRSI(closes, 14);
+  const lookback = Math.min(21, closes.length - 1);
+  const oldPrice = closes[closes.length - 1 - lookback];
+  const newPrice = closes[closes.length - 1];
+  const roc1m = oldPrice > 0 ? ((newPrice - oldPrice) / oldPrice) * 100 : null;
+  const sma50 = closes.length >= 50
+    ? closes.slice(-50).reduce((s, v) => s + v, 0) / 50
+    : closes.reduce((s, v) => s + v, 0) / closes.length;
+  const fiftyTwoWeekHigh = Math.max(...closes);
+  const fiftyTwoWeekLow = Math.min(...closes);
+  return { rsi, roc1m, sma50, fiftyTwoWeekHigh, fiftyTwoWeekLow };
+}
+
+// ---------- Main handler ----------
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -118,38 +177,91 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: '`symbols` array required' });
   }
 
-  try {
-    const { prices, changes, extras } = await fetchQuotes(symbols);
+  const prices = {}, changes = {}, extras = {}, technicals = {}, errors = [];
 
-    // Fetch technicals for requested symbols (RSI, 1M ROC, computed 50D SMA)
-    let technicals = {};
-    if (Array.isArray(techSymbols) && techSymbols.length) {
-      const techResults = await Promise.all(
-        techSymbols.map(async sym => {
-          const t = await fetchTechnicals(sym);
-          return [sym, t];
-        })
-      );
-      techResults.forEach(([sym, t]) => {
-        if (t) {
-          // Merge with extras from quote endpoint
-          const e = extras[sym] || {};
-          technicals[sym] = {
-            rsi: t.rsi,
-            roc1m: t.roc1m,
-            sma50: t.sma50 ?? e.fiftyDayAvg,
-            fiftyDayAvg: e.fiftyDayAvg,
-            twoHundredDayAvg: e.twoHundredDayAvg,
-            fiftyTwoWeekHigh: e.fiftyTwoWeekHigh,
-            fiftyTwoWeekLow: e.fiftyTwoWeekLow,
-            prevClose: e.prevClose,
-          };
-        }
-      });
+  // Split symbols by source
+  const cgIds = [];      // coingecko ids to fetch in one batch
+  const cgSymbolToId = {};
+  const finnhubSyms = [];
+
+  symbols.forEach(sym => {
+    const mapping = SYMBOL_MAP[sym];
+    if (!mapping) { errors.push(`Unknown symbol: ${sym}`); return; }
+    if (mapping.source === 'coingecko') {
+      cgIds.push(mapping.id);
+      cgSymbolToId[sym] = mapping.id;
+    } else if (mapping.source === 'finnhub' || mapping.source === 'finnhub-fx') {
+      finnhubSyms.push({ sym, id: mapping.id });
     }
+  });
 
-    res.status(200).json({ prices, changes, extras, technicals });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  // Batch CoinGecko
+  if (cgIds.length) {
+    const cgData = await fetchCoinGeckoPrices([...new Set(cgIds)], 'aud');
+    for (const sym of symbols) {
+      const id = cgSymbolToId[sym];
+      if (id && cgData[id]) {
+        prices[sym] = cgData[id].aud;
+        changes[sym] = cgData[id].aud_24h_change ?? null;
+        extras[sym] = {};
+      }
+    }
   }
+
+  // Finnhub (parallel)
+  await Promise.all(finnhubSyms.map(async ({ sym, id }) => {
+    const q = await fetchFinnhubQuote(id);
+    if (q) {
+      prices[sym] = q.price;
+      changes[sym] = q.changePct ?? null;
+      extras[sym] = {
+        prevClose: q.prevClose,
+        fiftyTwoWeekHigh: null,
+        fiftyTwoWeekLow: null,
+      };
+    }
+  }));
+
+  // Technicals (parallel) — compute from historical candles
+  if (Array.isArray(techSymbols) && techSymbols.length) {
+    await Promise.all(techSymbols.map(async sym => {
+      const mapping = SYMBOL_MAP[sym];
+      if (!mapping) return;
+      let closes = [];
+      if (mapping.source === 'coingecko') {
+        closes = await fetchCoinGeckoCandles(mapping.id, 'aud', 90);
+      } else if (mapping.source === 'finnhub') {
+        closes = await fetchFinnhubCandles(mapping.id, 90);
+      }
+      const t = computeTechnicals(closes);
+      if (t) {
+        technicals[sym] = {
+          rsi: t.rsi,
+          roc1m: t.roc1m,
+          sma50: t.sma50,
+          fiftyDayAvg: t.sma50,
+          fiftyTwoWeekHigh: t.fiftyTwoWeekHigh,
+          fiftyTwoWeekLow: t.fiftyTwoWeekLow,
+        };
+        // also backfill extras
+        if (!extras[sym]) extras[sym] = {};
+        extras[sym].fiftyTwoWeekHigh = t.fiftyTwoWeekHigh;
+        extras[sym].fiftyTwoWeekLow = t.fiftyTwoWeekLow;
+        extras[sym].fiftyDayAvg = t.sma50;
+      }
+    }));
+  }
+
+  res.status(200).json({
+    prices,
+    changes,
+    extras,
+    technicals,
+    errors: errors.length ? errors : undefined,
+    _meta: {
+      finnhubConfigured: !!FINNHUB_KEY,
+      coingeckoSymbols: cgIds.length,
+      finnhubSymbols: finnhubSyms.length,
+    },
+  });
 };
