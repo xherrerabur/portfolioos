@@ -448,17 +448,33 @@
         { event: 'Ethereum Protocol Upgrades', timing: 'H1 2026', holdings: ['ETH'], bullish: 'Improved throughput, lower L2 fees, staking yield increase', bearish: 'Delay or technical issues erode confidence' },
     ];
 
-    const MACRO_SYMBOLS = ['^GSPC', '^IXIC', '^VIX', '^TNX', '^FVX', 'DX-Y.NYB', 'GLD', 'TLT', 'HYG', 'BTC-AUD', 'AUDUSD=X'];
+    // Macro categories available in /api/macro — must match keys in UNIVERSE on the server
+    const MACRO_CATEGORIES = [
+        { key: 'tier1',                label: 'Tier 1 Core',          count: 20 },
+        { key: 'indices-global',       label: 'Global Indices',       count: 17 },
+        { key: 'sectors-us',           label: 'US Sectors',           count: 8 },
+        { key: 'defence',              label: 'Defence & Aero',       count: 8 },
+        { key: 'pharma-healthcare',    label: 'Pharma & Healthcare',  count: 9 },
+        { key: 'infrastructure',       label: 'Infrastructure',       count: 8 },
+        { key: 'resources-commodities',label: 'Resources & Comms',    count: 20 },
+        { key: 'fixed-income',         label: 'Fixed Income',         count: 9 },
+        { key: 'fx',                   label: 'FX',                   count: 12 },
+        { key: 'crypto',               label: 'Crypto',               count: 6 },
+        { key: 'volatility',           label: 'Volatility & Hedges',  count: 5 },
+        { key: 'semis-ai',             label: 'Semis & AI',           count: 8 },
+    ];
 
     // ==================== STATE ====================
     let S = {
         prices: {}, changes: {}, extras: {}, technicals: {},
-        macroPrices: {}, macroChanges: {},
         audusd: 1.0, isLive: false, lastUpdate: null,
         holdings: PORTFOLIO_HOLDINGS.map(h => ({ ...h })),
         totalValue: 0, totalDayPnl: 0, totalDayPnlPct: 0,
         unrealizedPnl: 0, totalReturn: 0, totalReturnPct: 0,
-        reconcileOk: false, reconcileError: 0, regime: 'CHOPPY',
+        reconcileOk: false, reconcileError: 0, regime: 'UNKNOWN',
+        // Macro state (fetched separately from prices)
+        macroInstruments: {}, macroBriefing: null, macroBriefingError: null,
+        macroLoadedCategories: new Set(),
     };
 
     // ==================== UTILITY ====================
@@ -506,32 +522,56 @@
     }
 
     // ==================== REGIME DETECTION ====================
+    // Uses the new macro instrument map (from /api/macro). Falls back to UNKNOWN
+    // when no macro data has been loaded yet.
     function detectRegime() {
-        const mp = S.macroPrices, mc = S.macroChanges;
-        const vix = mp['^VIX'], spChg = mc['^GSPC'], dxyChg = mc['DX-Y.NYB'], hygChg = mc['HYG'];
-        if (vix == null) return 'UNKNOWN';
+        const inst = S.macroInstruments;
+        if (!inst || Object.keys(inst).length === 0) return 'UNKNOWN';
+        const get = (k) => inst[k]?.changePct;
+        const spy = get('SPY'), vixy = get('VIXY'), hyg = get('HYG'), uup = get('UUP'), tlt = get('TLT');
         let score = 0;
-        if (vix < 16) score += 2; else if (vix < 20) score += 1; else if (vix > 25) score -= 2; else if (vix > 20) score -= 1;
-        if (spChg != null) { if (spChg > 0.5) score += 1; if (spChg < -0.5) score -= 1; }
-        if (dxyChg != null) { if (dxyChg < -0.3) score += 1; if (dxyChg > 0.3) score -= 1; }
-        if (hygChg != null) { if (hygChg > 0) score += 1; if (hygChg < -0.3) score -= 1; }
+        // VIXY falling is risk-on (volatility compressing)
+        if (vixy != null) {
+            if (vixy < -2) score += 2;
+            else if (vixy < 0) score += 1;
+            else if (vixy > 2) score -= 2;
+            else if (vixy > 0) score -= 1;
+        }
+        if (spy != null) {
+            if (spy > 0.5) score += 1;
+            if (spy < -0.5) score -= 1;
+        }
+        if (hyg != null) {
+            if (hyg > 0) score += 1;
+            if (hyg < -0.3) score -= 1;
+        }
+        if (uup != null) {
+            // Weak dollar = risk-on
+            if (uup < -0.3) score += 1;
+            if (uup > 0.3) score -= 1;
+        }
         if (score >= 3) return 'RISK-ON';
         if (score <= -2) return 'RISK-OFF';
         return 'CHOPPY';
     }
 
     // ==================== DATA FETCHING ====================
+    // /api/prices — only holdings. User asked for click-to-refresh only,
+    // so this runs on button click, not on page load.
     async function fetchPrices() {
+        const btn = document.getElementById('refreshBtn');
         try {
-            document.getElementById('refreshBtn').classList.add('loading');
-            document.getElementById('refreshBtn').disabled = true;
+            btn.classList.add('loading'); btn.disabled = true;
+            btn.textContent = 'LOADING...';
+
+            // Only the 6 holdings + AUD/USD for FX conversion
             const holdingSymbols = ['SOL-AUD', 'ETH-AUD', 'DOGE-AUD', 'SUI20947-USD', 'PENGU28905-USD', 'AMZN', 'AUDUSD=X'];
-            const allSymbols = [...new Set([...holdingSymbols, ...MACRO_SYMBOLS])];
             const techSymbols = holdingSymbols.filter(s => s !== 'AUDUSD=X');
 
             const response = await fetch(`${API_BASE}/api/prices`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbols: allSymbols, technicals: techSymbols })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbols: holdingSymbols, technicals: techSymbols })
             });
             if (!response.ok) throw new Error(`Price fetch failed: ${response.status}`);
             const data = await response.json();
@@ -541,15 +581,9 @@
             S.extras = data.extras || {};
             S.technicals = data.technicals || {};
             S.audusd = S.prices['AUDUSD=X'] || 0.65;
-
-            MACRO_SYMBOLS.forEach(sym => {
-                if (data.prices[sym] != null) S.macroPrices[sym] = data.prices[sym];
-                if (data.changes[sym] != null) S.macroChanges[sym] = data.changes[sym];
-            });
-
             S.isLive = Object.keys(S.prices).length > 2;
             S.lastUpdate = new Date();
-            S.regime = detectRegime();
+
             recalculate();
             renderAll();
             updateStatusBar();
@@ -557,31 +591,53 @@
             console.error('Price fetch error:', error);
             S.isLive = false;
             updateStatusBar();
+            alert(`Price fetch failed: ${error.message}\n\nCheck that FINNHUB_API_KEY is set in Vercel env vars.`);
         } finally {
-            document.getElementById('refreshBtn').classList.remove('loading');
-            document.getElementById('refreshBtn').disabled = false;
+            btn.classList.remove('loading'); btn.disabled = false;
+            btn.textContent = 'REFRESH PRICES';
         }
     }
 
-    async function fetchMacroBriefing() {
+    // /api/macro — fetch one or more instrument categories. Optionally
+    // request AI briefing generation in the same call.
+    async function fetchMacro(categories, withBriefing = false) {
+        const btn = document.getElementById('loadMacroBtn');
+        const briefBtn = document.getElementById('generateMacroBtn');
         try {
-            document.getElementById('generateMacroBtn').classList.add('loading');
-            document.getElementById('generateMacroBtn').disabled = true;
-            const response = await fetch(`${API_BASE}/api/macro`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-            if (!response.ok) throw new Error('Macro fetch failed');
+            if (withBriefing) { briefBtn.classList.add('loading'); briefBtn.disabled = true; briefBtn.textContent = 'GENERATING...'; }
+            else { btn.classList.add('loading'); btn.disabled = true; btn.textContent = 'LOADING...'; }
+
+            const response = await fetch(`${API_BASE}/api/macro`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categories, briefing: withBriefing })
+            });
+            if (!response.ok) throw new Error(`Macro fetch failed: ${response.status}`);
             const data = await response.json();
-            if (data.briefing) {
-                let html = '<div class="briefing-headline">' + (data.briefing.headline || 'Market Brief') + '</div>';
-                (data.briefing.sections || []).forEach(s => {
-                    html += `<div class="briefing-section"><div class="briefing-section-title">${s.label || s.title}</div><div class="briefing-section-body">${s.text || s.body}</div></div>`;
-                });
-                document.getElementById('briefingContent').innerHTML = html;
+
+            // Merge new instruments into existing state (don't wipe previous categories)
+            Object.assign(S.macroInstruments, data.instruments || {});
+            categories.forEach(c => S.macroLoadedCategories.add(c));
+            S.regime = detectRegime();
+
+            if (withBriefing) {
+                S.macroBriefing = data.briefing || null;
+                S.macroBriefingError = data.briefingError || null;
             }
+
+            document.getElementById('macroStatus').textContent =
+                `${Object.keys(S.macroInstruments).length} instruments loaded · regime: ${S.regime}`;
+
+            renderMacroView();
+            renderPlaybookView();   // regime change ripples into playbook
+            updateStatusBar();
         } catch (error) {
-            document.getElementById('briefingContent').innerHTML = '<span style="color: var(--red);">Error: ' + error.message + '</span>';
+            console.error('Macro fetch error:', error);
+            document.getElementById('macroStatus').textContent = 'ERROR: ' + error.message;
+            alert(`Macro fetch failed: ${error.message}`);
         } finally {
-            document.getElementById('generateMacroBtn').classList.remove('loading');
-            document.getElementById('generateMacroBtn').disabled = false;
+            btn.classList.remove('loading'); btn.disabled = false; btn.textContent = 'LOAD MACRO';
+            briefBtn.classList.remove('loading'); briefBtn.disabled = false; briefBtn.textContent = 'GENERATE BRIEFING';
         }
     }
 
@@ -791,7 +847,7 @@
             const cP = S.holdings.filter(h=>h.assetClass==='Crypto').reduce((s,h)=>s+h.dayPnlAUD,0);
             const eP = S.holdings.filter(h=>h.assetClass==='US Equities').reduce((s,h)=>s+h.dayPnlAUD,0);
             bullets += `<li>Crypto: ${fmtC(cP,0)} | US Equities: ${fmtC(eP,0)}</li>`;
-            const audChg = S.macroChanges['AUDUSD=X'];
+            const audChg = S.changes['AUDUSD=X'];
             if (audChg != null && Math.abs(audChg) > 0.1) {
                 bullets += `<li>AUD ${audChg>0?'strengthened':'weakened'} ${fmtN(Math.abs(audChg),2)}% — ${audChg>0?'headwind':'tailwind'} to USD holdings (AMZN, SUI, PENGU).</li>`;
             }
@@ -829,7 +885,7 @@
 
         // FX attribution
         const usdH = S.holdings.filter(h=>h.currency==='USD');
-        const audChg = S.macroChanges['AUDUSD=X'];
+        const audChg = S.changes['AUDUSD=X'];
         if (usdH.length > 0 && audChg != null) {
             const usdVal = usdH.reduce((s,h)=>s+h.marketValueAUD,0);
             const fxImpact = usdVal * (-audChg/100);
@@ -842,29 +898,119 @@
     }
 
     function renderMacroView() {
-        const mp = S.macroPrices, mc = S.macroChanges;
-        const fmt = (sym,d=2) => mp[sym]!=null ? fmtN(mp[sym],d) : '--';
-        const fc = (sym) => mc[sym]!=null ? ` (${fmtP(mc[sym])})` : '';
+        // ---- Category button bar ----
+        const bar = document.getElementById('macroCategoryBar');
+        bar.innerHTML = MACRO_CATEGORIES.map(c => {
+            const loaded = S.macroLoadedCategories.has(c.key);
+            return `<button class="macro-cat-btn ${loaded ? 'active' : ''}" data-cat="${c.key}">${c.label} (${c.count})</button>`;
+        }).join('') + `<button class="macro-cat-btn" data-cat="all" style="background:var(--purple); color:var(--bg-primary); border-color:var(--purple); font-weight:600">LOAD ALL 130</button>`;
+        // wire clicks (single-category load)
+        bar.querySelectorAll('.macro-cat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const cat = btn.dataset.cat;
+                if (cat === 'all') fetchMacro(['all'], false);
+                else fetchMacro([cat], false);
+            });
+        });
 
-        document.getElementById('ind-sp500').textContent = fmt('^GSPC') + fc('^GSPC');
-        document.getElementById('ind-nasdaq').textContent = fmt('^IXIC') + fc('^IXIC');
-        document.getElementById('ind-vix').textContent = fmt('^VIX');
-        document.getElementById('ind-10y').textContent = fmt('^TNX') + '%';
-        document.getElementById('ind-2y').textContent = fmt('^FVX') + '%';
-        document.getElementById('ind-dxy').textContent = fmt('DX-Y.NYB') + fc('DX-Y.NYB');
-        document.getElementById('ind-gld').textContent = '$' + fmt('GLD') + fc('GLD');
-        document.getElementById('ind-tlt').textContent = '$' + fmt('TLT') + fc('TLT');
-        document.getElementById('ind-btc').textContent = 'A$' + (mp['BTC-AUD']!=null?Math.round(mp['BTC-AUD']).toLocaleString():'--') + fc('BTC-AUD');
-        document.getElementById('ind-audusd').textContent = fmt('AUDUSD=X',4);
+        // ---- Instrument grid ----
+        const instEntries = Object.entries(S.macroInstruments);
+        const grid = document.getElementById('macroGrid');
+        if (!instEntries.length) {
+            grid.innerHTML = '<p style="color:var(--text-muted); grid-column: 1/-1">No data loaded yet — click LOAD MACRO or a specific category.</p>';
+        } else {
+            // Group by category for readability
+            const byCat = {};
+            instEntries.forEach(([k, v]) => {
+                const cat = v.category || 'other';
+                if (!byCat[cat]) byCat[cat] = [];
+                byCat[cat].push([k, v]);
+            });
+            let html = '';
+            MACRO_CATEGORIES.forEach(c => {
+                const items = byCat[c.key];
+                if (!items || !items.length) return;
+                html += `<div style="grid-column: 1/-1; color:var(--text-muted); font-size:9px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; padding-top:8px; border-top:1px solid var(--border)">${c.label} · ${items.length}</div>`;
+                items.forEach(([k, v]) => {
+                    const chg = v.changePct;
+                    const cls = chg == null ? '' : (chg >= 0 ? 'positive' : 'negative');
+                    const priceStr = v.price != null
+                        ? (v.price > 1000 ? v.price.toFixed(0) : v.price.toFixed(2))
+                        : '--';
+                    html += `<div class="macro-tile">
+                        <div class="macro-tile-name" title="${v.name}">${v.name}</div>
+                        <div class="macro-tile-price">${priceStr}</div>
+                        <div class="macro-tile-change ${cls}">${chg != null ? fmtP(chg, 2) : '--'}</div>
+                    </div>`;
+                });
+            });
+            grid.innerHTML = html;
+        }
 
-        // Dynamic macro mapping
-        const vix=mp['^VIX'], dxy=mp['DX-Y.NYB'], tnx=mp['^TNX'], dxyC=mc['DX-Y.NYB'], tnxC=mc['^TNX'];
+        // ---- AI briefing (v2 layout) ----
+        const bc = document.getElementById('briefingContent');
+        if (S.macroBriefing) {
+            const b = S.macroBriefing;
+            bc.innerHTML = `
+                <div class="briefing-v2">
+                    <div class="briefing-v2-headline">${b.headline || 'Market Brief'}</div>
+                    ${b.story ? `<div class="briefing-v2-para story"><div class="briefing-v2-para-label">The Story</div><div class="briefing-v2-para-body">${b.story}</div></div>` : ''}
+                    ${b.movers ? `<div class="briefing-v2-para movers"><div class="briefing-v2-para-label">Movers & Themes</div><div class="briefing-v2-para-body">${b.movers}</div></div>` : ''}
+                    ${b.forMe ? `<div class="briefing-v2-para forMe"><div class="briefing-v2-para-label">What This Means For Your Portfolio</div><div class="briefing-v2-para-body">${b.forMe}</div></div>` : ''}
+                    ${b.watch ? `<div class="briefing-v2-para watch"><div class="briefing-v2-para-label">One Thing To Watch</div><div class="briefing-v2-para-body">${b.watch}</div></div>` : ''}
+                </div>`;
+        } else if (S.macroBriefingError) {
+            bc.innerHTML = `<span style="color:var(--red)">Error: ${S.macroBriefingError}</span>`;
+        }
+        // else leave the explanatory placeholder
+
+        // ---- Personalized macro mapping table ----
+        const get = (sym) => S.macroInstruments[sym] || {};
+        const spy = get('SPY'), tlt = get('TLT'), uup = get('UUP'), hyg = get('HYG'),
+              vixy = get('VIXY'), gld = get('GLD'), btc = get('bitcoin'), usdjpy = get('OANDA:USD_JPY');
         const rows = [
-            { d:'DXY (USD Strength)', c:dxy!=null?`${fmtN(dxy)}${fc('DX-Y.NYB')}`:'--', sig:dxyC!=null?(dxyC>0.3?'USD Strengthening — HEADWIND':dxyC<-0.3?'USD Weakening — TAILWIND':'Flat'):'--', h:'BTC, SOL, ETH, SUI (inverse USD)', imp:dxyC!=null?(dxyC>0?'Negative — strong USD pressures crypto':'Positive — weak USD supports risk'):'--' },
-            { d:'10Y Yield', c:tnx!=null?`${fmtN(tnx)}%${fc('^TNX')}`:'--', sig:tnx!=null?(tnx>4.5?'Yields elevated — growth discount':tnx<3.5?'Yields low — growth friendly':'Neutral'):'--', h:'AMZN (duration-sensitive growth)', imp:tnxC!=null?(tnxC>0?'Negative for AMZN multiples':'Positive for AMZN'):'--' },
-            { d:'VIX', c:vix!=null?fmtN(vix):'--', sig:vix!=null?(vix>25?'Elevated — risk-off':vix<16?'Low — complacency':'Moderate'):'--', h:'All — vol regime', imp:vix!=null?(vix>25?'Risk-off: crypto highly vulnerable':vix<16?'Risk-on but watch for vol spike':'Normal conditions'):'--' },
-            { d:'HYG (Credit)', c:mp['HYG']!=null?`$${fmtN(mp['HYG'])}${fc('HYG')}`:'--', sig:mc['HYG']!=null?(mc['HYG']>0?'Credit healthy':'Credit stress'):'--', h:'Portfolio-wide risk appetite', imp:mc['HYG']!=null?(mc['HYG']<-0.3?'Warning — credit weakness precedes selloffs':'Supportive'):'--' },
-            { d:'AUD/USD', c:fmt('AUDUSD=X',4), sig:mc['AUDUSD=X']!=null?(mc['AUDUSD=X']>0?'AUD strengthening':'AUD weakening'):'--', h:'AMZN, SUI, PENGU (USD-denom)', imp:mc['AUDUSD=X']!=null?(mc['AUDUSD=X']>0?'Headwind on USD positions':'Tailwind on USD positions'):'--' },
+            {
+                d: 'US Dollar (UUP)',
+                c: uup.price != null ? `${fmtN(uup.price,2)} (${fmtP(uup.changePct,2)})` : '--',
+                sig: uup.changePct != null ? (uup.changePct > 0.3 ? 'USD STRENGTHENING — HEADWIND' : uup.changePct < -0.3 ? 'USD WEAKENING — TAILWIND' : 'Flat') : '--',
+                h: 'SOL, ETH, DOGE, SUI, PENGU — crypto inverse USD',
+                imp: uup.changePct != null ? (uup.changePct > 0 ? 'Negative — strong USD compresses risk assets and crypto' : 'Positive — weak USD supports crypto book') : '--',
+            },
+            {
+                d: 'Long Bonds (TLT)',
+                c: tlt.price != null ? `${fmtN(tlt.price,2)} (${fmtP(tlt.changePct,2)})` : '--',
+                sig: tlt.changePct != null ? (tlt.changePct > 0.3 ? 'BONDS BID — yields falling' : tlt.changePct < -0.3 ? 'BONDS SOLD — yields rising' : 'Flat') : '--',
+                h: 'AMZN (duration-sensitive growth)',
+                imp: tlt.changePct != null ? (tlt.changePct > 0 ? 'Positive for AMZN — multiple expansion as rates fall' : 'Negative for AMZN — rising rates compress growth multiples') : '--',
+            },
+            {
+                d: 'Volatility (VIXY proxy)',
+                c: vixy.price != null ? `${fmtN(vixy.price,2)} (${fmtP(vixy.changePct,2)})` : '--',
+                sig: vixy.changePct != null ? (vixy.changePct > 5 ? 'VOL EXPANDING — risk-off warning' : vixy.changePct < -5 ? 'VOL COMPRESSING — risk-on' : 'Normal') : '--',
+                h: 'All — vol regime',
+                imp: vixy.changePct != null ? (vixy.changePct > 5 ? 'Crypto high-beta hit hardest in vol spikes' : 'Supportive for risk appetite') : '--',
+            },
+            {
+                d: 'Credit (HYG)',
+                c: hyg.price != null ? `${fmtN(hyg.price,2)} (${fmtP(hyg.changePct,2)})` : '--',
+                sig: hyg.changePct != null ? (hyg.changePct > 0 ? 'Credit healthy — risk appetite on' : hyg.changePct < -0.3 ? 'Credit stress — warning signal' : 'Flat') : '--',
+                h: 'Portfolio-wide — broad risk appetite',
+                imp: hyg.changePct != null ? (hyg.changePct < -0.3 ? 'Credit weakness precedes equity/crypto selloffs — defensive posture warranted' : 'Supportive for risk book') : '--',
+            },
+            {
+                d: 'Gold (GLD)',
+                c: gld.price != null ? `${fmtN(gld.price,2)} (${fmtP(gld.changePct,2)})` : '--',
+                sig: gld.changePct != null ? (gld.changePct > 0.5 ? 'Gold bid — safe-haven demand' : gld.changePct < -0.5 ? 'Gold sold — risk-on' : 'Flat') : '--',
+                h: 'Indirect — safe-haven competitor to crypto',
+                imp: gld.changePct != null ? (gld.changePct > 0.5 ? 'Gold/crypto rotation possible — crypto may lag' : 'Crypto likely absorbing the flight-to-quality bid') : '--',
+            },
+            {
+                d: 'S&P 500 (SPY)',
+                c: spy.price != null ? `${fmtN(spy.price,2)} (${fmtP(spy.changePct,2)})` : '--',
+                sig: spy.changePct != null ? (spy.changePct > 0.5 ? 'Equities up — risk-on' : spy.changePct < -0.5 ? 'Equities down — risk-off' : 'Flat') : '--',
+                h: 'AMZN (direct) + crypto correlation',
+                imp: spy.changePct != null ? (spy.changePct > 0 ? 'Direct positive for AMZN, crypto typically follows equity beta' : 'Direct negative for AMZN, crypto likely down in sympathy') : '--',
+            },
         ];
         document.getElementById('macroMappingBody').innerHTML = rows.map(r =>
             `<tr><td><strong>${r.d}</strong></td><td>${r.c}</td><td>${r.sig}</td><td style="font-size:9px">${r.h}</td><td style="font-size:9px">${r.imp}</td></tr>`
@@ -876,21 +1022,28 @@
             <p style="margin-top:6px">40% BTC (Core Crypto) + 25% SPY (US Equities) + 10% SOL (Satellite) + 5% DOGE (Speculative) + 20% Cash (SHV)</p>
             <p style="margin-top:6px;color:var(--text-muted)">Benchmark returns require historical data. Showing directional day-change analysis.</p>`;
 
+        // Sleeve benchmarks — benchCh() resolves a sleeve benchmark's day change
+        // from either holdings (S.changes) or macro instruments (S.macroInstruments).
+        const benchCh = (key) => {
+            if (S.changes[key] != null) return S.changes[key];
+            const inst = S.macroInstruments[key];
+            return inst && inst.changePct != null ? inst.changePct : null;
+        };
         const sleeves = [
-            { name: 'Core Crypto (SOL/ETH)', bench: 'BTC-AUD', hk: ['SOL','ETH'] },
-            { name: 'US Equities (AMZN)', bench: '^GSPC', hk: ['AMZN'] },
-            { name: 'Satellite (SUI)', bench: 'SOL-AUD', hk: ['SUI'] },
-            { name: 'Speculative (DOGE/PENGU)', bench: 'DOGE-AUD', hk: ['DOGE','PENGU'] },
+            { name: 'Core Crypto (SOL/ETH)', bench: 'bitcoin',   label: 'BTC',  hk: ['SOL','ETH'] },
+            { name: 'US Equities (AMZN)',    bench: 'SPY',       label: 'SPY',  hk: ['AMZN'] },
+            { name: 'Satellite (SUI)',       bench: 'SOL-AUD',   label: 'SOL',  hk: ['SUI'] },
+            { name: 'Speculative (DOGE/PENGU)', bench: 'DOGE-AUD', label: 'DOGE', hk: ['DOGE','PENGU'] },
         ];
         document.getElementById('sleeveBenchmarkBody').innerHTML = sleeves.map(sl => {
             const sH = S.holdings.filter(h=>sl.hk.includes(h.ticker));
             const sV = sH.reduce((s,h)=>s+h.marketValueAUD,0);
             const sDP = sH.reduce((s,h)=>s+h.dayPnlAUD,0);
             const sPct = sV>0?(sDP/sV*100):0;
-            const bChg = S.macroChanges[sl.bench] ?? S.changes[sl.bench];
+            const bChg = benchCh(sl.bench);
             const alpha = bChg!=null?sPct-bChg:null;
-            const interp = alpha!=null?(alpha>0?'Positive selection effect':'Negative selection effect'):'Benchmark unavailable';
-            return `<tr><td><strong>${sl.name}</strong></td><td>${sl.bench}</td><td class="num">${fmtP(sPct)}</td><td class="num">${bChg!=null?fmtP(bChg):'--'}</td>
+            const interp = alpha!=null?(alpha>0?'Positive selection effect':'Negative selection effect'):'Benchmark not loaded — fetch macro data';
+            return `<tr><td><strong>${sl.name}</strong></td><td>${sl.label}</td><td class="num">${fmtP(sPct)}</td><td class="num">${bChg!=null?fmtP(bChg):'--'}</td>
                 <td class="num ${alpha!=null?clr(alpha):''}">${alpha!=null?fmtP(alpha):'--'}</td><td style="font-size:9px">${interp}</td></tr>`;
         }).join('');
 
