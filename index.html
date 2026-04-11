@@ -134,6 +134,76 @@
         .catalyst-timing { font-size: 9px; color: var(--text-muted); }
         .catalyst-body { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
 
+        /* Portfolio Characterization — LOUD */
+        .characterization-card { background: linear-gradient(135deg, rgba(248,81,73,0.15), rgba(240,136,62,0.12)); border: 2px solid var(--red); padding: 14px 16px; border-radius: 2px; margin-bottom: 12px; }
+        .characterization-title { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .characterization-body { font-size: 12px; color: var(--text-primary); line-height: 1.6; font-weight: 500; }
+        .characterization-body strong { color: var(--orange); }
+
+        /* Macro: Tier 1 + Category drill-downs */
+        .macro-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        .macro-category-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; padding: 6px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 2px; }
+        .macro-cat-btn { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); padding: 4px 8px; border-radius: 2px; font-family: 'JetBrains Mono', monospace; font-size: 9px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; }
+        .macro-cat-btn:hover { background: var(--border); color: var(--text-primary); }
+        .macro-cat-btn.active { background: var(--blue); color: var(--bg-primary); border-color: var(--blue); font-weight: 600; }
+        .macro-cat-btn.loading { opacity: 0.5; cursor: wait; }
+        .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-bottom: 12px; }
+        .macro-tile { background: var(--bg-secondary); border: 1px solid var(--border); padding: 6px 8px; border-radius: 2px; font-size: 10px; }
+        .macro-tile-name { color: var(--text-muted); font-size: 9px; text-transform: uppercase; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .macro-tile-price { font-weight: 600; color: var(--text-primary); font-size: 11px; }
+        .macro-tile-change { font-size: 9px; font-weight: 600; }
+        .macro-tile-change.positive { color: var(--green); }
+        .macro-tile-change.negative { color: var(--red); }
+
+        /* Briefing v2 — 4 paragraph structure */
+        .briefing-v2 { display: flex; flex-direction: column; gap: 8px; }
+        .briefing-v2-headline { font-size: 13px; font-weight: 600; color: var(--text-primary); padding: 6px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+        .briefing-v2-para { padding: 6px 8px; border-left: 2px solid var(--border); }
+        .briefing-v2-para.story { border-left-color: var(--blue); }
+        .briefing-v2-para.movers { border-left-color: var(--orange); }
+        .briefing-v2-para.forMe { border-left-color: var(--green); background: rgba(63,185,80,0.05); }
+        .briefing-v2-para.watch { border-left-color: var(--purple); }
+        .briefing-v2-para-label { font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+        .briefing-v2-para-body { font-size: 10px; color: var(--text-secondary); line-height: 1.5; }
+        .briefing-v2-explain { font-size: 9px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
+
+        /* Playbook v2 — ranked action list */
+        .playbook-banner { background: var(--bg-secondary); border: 1px solid var(--border); padding: 10px 12px; border-radius: 2px; margin-bottom: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+        .playbook-banner-item { display: flex; flex-direction: column; gap: 2px; }
+        .playbook-banner-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+        .playbook-banner-value { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .action-card { background: var(--bg-secondary); border: 1px solid var(--border); border-left-width: 3px; padding: 10px 12px; border-radius: 2px; margin-bottom: 6px; }
+        .action-card.urgent { border-left-color: var(--red); }
+        .action-card.high   { border-left-color: var(--orange); }
+        .action-card.med    { border-left-color: var(--yellow); }
+        .action-card.low    { border-left-color: var(--blue); }
+        .action-card.watch  { border-left-color: var(--text-muted); }
+        .action-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 10px; flex-wrap: wrap; }
+        .action-card-left { display: flex; gap: 8px; align-items: center; flex: 1; }
+        .action-card-rank { font-size: 10px; font-weight: 700; color: var(--text-muted); background: var(--bg-tertiary); padding: 2px 6px; border-radius: 2px; min-width: 24px; text-align: center; }
+        .action-card-ticker { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+        .action-card-type { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 2px; text-transform: uppercase; }
+        .action-card-type.EXIT, .action-card-type.TRIM { background: rgba(248,81,73,0.2); color: var(--red); }
+        .action-card-type.ADD { background: rgba(63,185,80,0.2); color: var(--green); }
+        .action-card-type.REBALANCE { background: rgba(88,166,255,0.2); color: var(--blue); }
+        .action-card-type.HEDGE { background: rgba(137,87,229,0.2); color: var(--purple); }
+        .action-card-type.WATCH { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+        .action-card-size { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+        .action-card-size-pct { font-size: 9px; color: var(--text-muted); }
+        .action-card-reason { font-size: 10px; color: var(--text-secondary); line-height: 1.4; }
+        .action-card-meta { display: flex; gap: 10px; margin-top: 6px; font-size: 9px; color: var(--text-muted); }
+        .action-card-meta span { display: flex; align-items: center; gap: 3px; }
+        .action-card-sources { display: flex; gap: 4px; }
+        .action-source-pill { background: var(--bg-tertiary); padding: 1px 4px; border-radius: 2px; font-size: 9px; color: var(--text-secondary); }
+        .confidence-HIGH { color: var(--green); }
+        .confidence-MED  { color: var(--yellow); }
+        .confidence-LOW  { color: var(--text-muted); }
+
+        /* Welcome banner (first-load state before prices fetched) */
+        .welcome-banner { background: linear-gradient(135deg, rgba(88,166,255,0.1), rgba(63,185,80,0.08)); border: 1px solid var(--blue); padding: 14px 16px; border-radius: 2px; margin-bottom: 12px; text-align: center; }
+        .welcome-banner-title { font-size: 12px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .welcome-banner-body { font-size: 10px; color: var(--text-secondary); line-height: 1.5; }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--bg-secondary); }
@@ -241,7 +311,13 @@
                     <table><thead><tr><th>Ticker</th><th class="num">Current %</th><th class="num">Target %</th><th class="num">Drift %</th><th class="num">A$ to Add/Trim</th><th>Action</th></tr></thead><tbody id="positionDriftBody"></tbody></table>
 
                     <h2>PORTFOLIO CHARACTERIZATION</h2>
-                    <div class="card"><p id="characterization"></p></div>
+                    <div class="characterization-card" id="characterizationCard">
+                        <div class="characterization-title">
+                            <span class="material-symbols-outlined" style="font-size:14px">warning</span>
+                            <span id="characterizationTitle">PORTFOLIO RISK PROFILE</span>
+                        </div>
+                        <div class="characterization-body" id="characterization">Load prices to see characterization.</div>
+                    </div>
                 </div>
 
                 <!-- ========== ATTRIBUTION VIEW ========== -->
@@ -265,33 +341,28 @@
 
                 <!-- ========== MACRO VIEW ========== -->
                 <div class="view" data-view="macro" id="macroView">
-                    <h1>MACRO OVERLAY</h1>
-                    <div class="grid-2">
-                        <div>
-                            <h2>KEY INDICATORS</h2>
-                            <div class="indicators-panel">
-                                <div class="indicator-item"><span class="indicator-name">S&P 500</span><span class="indicator-value" id="ind-sp500">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">NASDAQ</span><span class="indicator-value" id="ind-nasdaq">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">VIX</span><span class="indicator-value" id="ind-vix">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">10Y Yield</span><span class="indicator-value" id="ind-10y">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">2Y Yield</span><span class="indicator-value" id="ind-2y">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">DXY</span><span class="indicator-value" id="ind-dxy">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">Gold (GLD)</span><span class="indicator-value" id="ind-gld">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">TLT (20Y Bond)</span><span class="indicator-value" id="ind-tlt">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">BTC (A$)</span><span class="indicator-value" id="ind-btc">--</span></div>
-                                <div class="indicator-item"><span class="indicator-name">AUD/USD</span><span class="indicator-value" id="ind-audusd">--</span></div>
-                            </div>
-                        </div>
-                        <div>
-                            <h2>AI BRIEFING</h2>
-                            <div class="briefing-panel">
-                                <div class="briefing-header"><span>Market Intelligence</span><button id="generateMacroBtn">GENERATE</button></div>
-                                <div id="briefingContent" style="font-size: 10px; color: var(--text-secondary);">Click "Generate" to fetch AI briefing...</div>
-                            </div>
+                    <div class="macro-header">
+                        <h1 style="margin:0">MACRO OVERLAY</h1>
+                        <div style="display:flex; gap:8px; align-items:center">
+                            <span id="macroStatus" style="font-size:10px; color:var(--text-muted)">--</span>
+                            <button id="loadMacroBtn">LOAD MACRO</button>
+                            <button id="generateMacroBtn" style="background:var(--purple)">GENERATE BRIEFING</button>
                         </div>
                     </div>
+                    <p id="macroIntro" style="margin-bottom:8px">Click <strong>LOAD MACRO</strong> to fetch Tier 1 core instruments. Click any category below to drill into specific universes. Click <strong>GENERATE BRIEFING</strong> for an AI macro note linked to your holdings.</p>
+
+                    <div class="macro-category-bar" id="macroCategoryBar"></div>
+
+                    <h2>INSTRUMENTS</h2>
+                    <div class="macro-grid" id="macroGrid"><p style="color:var(--text-muted); grid-column: 1/-1">No data loaded yet — click LOAD MACRO.</p></div>
+
+                    <h2>AI MACRO BRIEFING <span style="font-size:9px; color:var(--text-muted); font-weight:400">— 4-paragraph desk note linking macro to your portfolio</span></h2>
+                    <div class="briefing-panel" id="briefingPanel">
+                        <div id="briefingContent" style="font-size:10px; color:var(--text-muted)">Click <strong>GENERATE BRIEFING</strong> above.<br><br><strong>What this will generate:</strong> A 4-paragraph desk note in the style of a senior macro strategist — THE STORY (today's driver), MOVERS &amp; THEMES (what's ripping beneath the surface, not just on the dashboard), WHAT THIS MEANS FOR YOUR PORTFOLIO (direct read on SOL/ETH/AMZN/DOGE/SUI/PENGU), ONE THING TO WATCH (a specific upcoming catalyst). The prompt explicitly forbids repeating any numbers already on screen.</div>
+                    </div>
+
                     <h2>PERSONALIZED MACRO MAPPING</h2>
-                    <table><thead><tr><th>Macro Driver</th><th>Current</th><th>Signal</th><th>My Exposed Holdings</th><th>Portfolio Impact</th></tr></thead><tbody id="macroMappingBody"></tbody></table>
+                    <table><thead><tr><th>Macro Driver</th><th>Current</th><th>Signal</th><th>My Exposed Holdings</th><th>Portfolio Impact</th></tr></thead><tbody id="macroMappingBody"><tr><td colspan="5" style="color:var(--text-muted)">Load macro data to populate.</td></tr></tbody></table>
                 </div>
 
                 <!-- ========== BENCHMARK VIEW ========== -->
@@ -307,9 +378,18 @@
 
                 <!-- ========== PLAYBOOK VIEW ========== -->
                 <div class="view" data-view="playbook" id="playbookView">
-                    <h1>ACTION PLAYBOOK</h1>
-                    <h2>ACTION QUEUE</h2>
-                    <table><thead><tr><th>Priority</th><th>Ticker/Bucket</th><th>Action</th><th class="num">A$ Size</th><th>Funding Source</th><th>Rationale</th><th>Risk</th></tr></thead><tbody id="actionQueueBody"></tbody></table>
+                    <h1>ACTION PLAYBOOK <span style="font-size:10px; color:var(--text-muted); font-weight:400">— unified action list aggregating Risk, Attribution, Technicals, Macro</span></h1>
+
+                    <div class="playbook-banner" id="playbookBanner">
+                        <div class="playbook-banner-item"><div class="playbook-banner-label">Regime</div><div class="playbook-banner-value" id="pbRegime">--</div></div>
+                        <div class="playbook-banner-item"><div class="playbook-banner-label">Open Actions</div><div class="playbook-banner-value" id="pbOpenCount">--</div></div>
+                        <div class="playbook-banner-item"><div class="playbook-banner-label">Urgent</div><div class="playbook-banner-value" id="pbUrgentCount" style="color:var(--red)">--</div></div>
+                        <div class="playbook-banner-item"><div class="playbook-banner-label">Total Rebalance Size</div><div class="playbook-banner-value" id="pbRebalanceSize">--</div></div>
+                        <div class="playbook-banner-item"><div class="playbook-banner-label">Cash Target</div><div class="playbook-banner-value" id="pbCashTarget">--</div></div>
+                    </div>
+
+                    <h2>RANKED ACTIONS</h2>
+                    <div id="actionCardList"><p style="color:var(--text-muted)">Load prices to generate actions.</p></div>
 
                     <h2>CONVICTION & THESIS MONITOR</h2>
                     <table><thead><tr><th>Ticker</th><th>Thesis</th><th>Status</th><th>Add On</th><th>Trim On</th><th>Invalidation</th><th>Next Catalyst</th></tr></thead><tbody id="thesisBody"></tbody></table>
