@@ -277,6 +277,8 @@
                 <div class="view active" data-view="portfolio" id="portfolioView">
                     <h1>PORTFOLIO OVERVIEW</h1>
                     <div class="cards-row" id="portfolioCards"></div>
+                    <div class="cards-row" id="periodCards"></div>
+                    <div id="periodFootnote" style="font-size:9px;color:var(--text-muted);margin:-6px 0 8px 2px"></div>
                     <div id="reconciliationBanner"></div>
                     <h2>HOLDINGS</h2>
                     <div style="overflow-x: auto;">
@@ -406,18 +408,28 @@
     // ==================== CONFIG ====================
     const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost') ? 'http://localhost:3001' : '';
 
+    // Source of truth: Trade_Log_Cleanedv3 Holdings snapshot (06 Apr 2026).
+    // All costBasis values are AUD. AMZN shares were purchased in AUD already
+    // (net_cost A$4,683.40 for 16 shares), so costBasis is NOT FX-converted.
+    // Only AMZN's live PRICE from Finnhub (USD) is converted to AUD at runtime —
+    // hence the explicit `priceCurrency` field.
+    // PENGU, SPX, COQ, PEPE, SHIB are closed/negligible and excluded from totals
+    // per the Excel note: "SPX and PENGU have negligible residual balances —
+    // excluded from portfolio totals."
     const PORTFOLIO_HOLDINGS = [
-        { ticker: 'SOL', name: 'Solana', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 48.77, avgCost: 210.6974, costBasis: 10274.29, fees: 61.76, firstBuy: '2024-01-05', yf: 'SOL-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
-        { ticker: 'ETH', name: 'Ethereum', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 1.71, avgCost: 3756.0234, costBasis: 6422.80, fees: 34.77, firstBuy: '2024-01-11', yf: 'ETH-AUD', currency: 'AUD', positionType: 'core', conviction: 'high' },
-        { ticker: 'AMZN', name: 'Amazon.com', assetClass: 'US Equities', theme: 'Mega-Cap Tech', shares: 16, avgCost: 292.7125, costBasis: 4683.40, fees: 0, firstBuy: '2026-02-12', yf: 'AMZN', currency: 'USD', positionType: 'core', conviction: 'high' },
-        { ticker: 'DOGE', name: 'Dogecoin', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 15385.71, avgCost: 0.18886, costBasis: 2905.85, fees: 10.96, firstBuy: '2024-07-08', yf: 'DOGE-AUD', currency: 'AUD', positionType: 'speculative', conviction: 'low' },
-        { ticker: 'SUI', name: 'Sui', assetClass: 'Crypto', theme: 'L1 Infrastructure', shares: 335.72, avgCost: 4.9828, costBasis: 1672.98, fees: 9.88, firstBuy: '2024-12-30', yf: 'SUI20947-USD', currency: 'USD', positionType: 'satellite', conviction: 'medium' },
-        { ticker: 'PENGU', name: 'Pudgy Penguins', assetClass: 'Crypto', theme: 'Meme / Speculative', shares: 0.875, avgCost: 428.1177, costBasis: 374.60, fees: 3.13, firstBuy: '2025-07-17', yf: 'PENGU28905-USD', currency: 'USD', positionType: 'speculative', conviction: 'low' },
+        { ticker: 'SOL',  name: 'Solana',     assetClass: 'Crypto',      theme: 'L1 Infrastructure',   shares: 46.72287009, avgCost: 254.8109696,  costBasis: 11905.49983, fees: 0, firstBuy: '2024-01-05', yf: 'SOL-AUD',      currency: 'AUD', priceCurrency: 'AUD', positionType: 'core',        conviction: 'high' },
+        { ticker: 'ETH',  name: 'Ethereum',   assetClass: 'Crypto',      theme: 'L1 Infrastructure',   shares: 1.7556557,   avgCost: 4761.856392,  costBasis: 8360.180317, fees: 0, firstBuy: '2024-01-11', yf: 'ETH-AUD',      currency: 'AUD', priceCurrency: 'AUD', positionType: 'core',        conviction: 'high' },
+        { ticker: 'AMZN', name: 'Amazon.com', assetClass: 'US Equities', theme: 'Mega-Cap Tech',       shares: 16,          avgCost: 292.7125,     costBasis: 4683.40,     fees: 0, firstBuy: '2026-02-12', yf: 'AMZN',         currency: 'AUD', priceCurrency: 'USD', positionType: 'core',        conviction: 'high' },
+        { ticker: 'DOGE', name: 'Dogecoin',   assetClass: 'Crypto',      theme: 'Meme / Speculative',  shares: 15389.7042,  avgCost: 0.1888174803, costBasis: 2905.84517,  fees: 0, firstBuy: '2024-07-08', yf: 'DOGE-AUD',     currency: 'AUD', priceCurrency: 'AUD', positionType: 'speculative', conviction: 'low' },
+        { ticker: 'SUI',  name: 'Sui',        assetClass: 'Crypto',      theme: 'L1 Infrastructure',   shares: 335.785398,  avgCost: 4.982299619,  costBasis: 1672.983461, fees: 0, firstBuy: '2024-12-30', yf: 'SUI20947-USD', currency: 'AUD', priceCurrency: 'AUD', positionType: 'satellite',   conviction: 'medium' },
     ];
 
-    const TOTAL_COST_BASIS = 26333.92;
-    const TOTAL_FEES = 125.50;
-    const REALIZED_PNL = -644.92;
+    // Source of truth = Trade_Log_Cleanedv3 Holdings sheet. That sheet does
+    // NOT break out a realized P&L line — it only tracks the open positions
+    // above plus a "Minor / Closed Positions" note. Any fully-closed tickers
+    // (COQ, PEPE, SHIB, SPX, PENGU) are intentionally ignored here.
+    const TOTAL_FEES = 0;
+    const REALIZED_PNL = 0;
     const CASH_BALANCE = 0;
 
     // ASSUMED TARGET MODEL
@@ -470,8 +482,13 @@
         audusd: 1.0, isLive: false, lastUpdate: null,
         holdings: PORTFOLIO_HOLDINGS.map(h => ({ ...h })),
         totalValue: 0, totalDayPnl: 0, totalDayPnlPct: 0,
+        totalCostBasis: 0,                        // derived live from holdings + FX
         unrealizedPnl: 0, totalReturn: 0, totalReturnPct: 0,
-        reconcileOk: false, reconcileError: 0, regime: 'UNKNOWN',
+        reconcileOk: false, reconcileError: 0, reconcileMsg: '',
+        regime: 'UNKNOWN',
+        // Period returns (filled by fetchHistory + computePeriodReturns)
+        history: {},                              // { yf: [{date, priceAUD}] }
+        periodReturns: null,                      // { w1, m1, m3, ytd, y1, si }
         // Macro state (fetched separately from prices)
         macroInstruments: {}, macroBriefing: null, macroBriefingError: null,
         macroLoadedCategories: new Set(),
@@ -587,6 +604,10 @@
             recalculate();
             renderAll();
             updateStatusBar();
+
+            // Fire-and-forget history fetch on the same click. Period cards
+            // populate as soon as it returns; no second button needed.
+            fetchHistory().then(() => { recalculate(); renderPortfolioView(); }).catch(e => console.warn('history fetch failed:', e));
         } catch (error) {
             console.error('Price fetch error:', error);
             S.isLive = false;
@@ -596,6 +617,31 @@
             btn.classList.remove('loading'); btn.disabled = false;
             btn.textContent = 'REFRESH PRICES';
         }
+    }
+
+    // /api/history — fetch ~400 days of daily AUD closes for each crypto
+    // holding. AMZN is skipped (no free historical USD source wired up yet).
+    // Result is stored on S.history keyed by holding.yf.
+    async function fetchHistory() {
+        const symbols = S.holdings
+            .filter(h => h.currency !== 'USD')   // crypto only for now
+            .map(h => h.yf);
+        if (!symbols.length) return;
+
+        const response = await fetch(`${API_BASE}/api/history`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols, days: 400 })
+        });
+        if (!response.ok) throw new Error(`History fetch failed: ${response.status}`);
+        const data = await response.json();
+
+        // Each series comes back as [[ms, priceAUD], ...]. Convert to {date, priceAUD}.
+        const out = {};
+        Object.entries(data.series || {}).forEach(([sym, points]) => {
+            out[sym] = (points || []).map(p => ({ date: new Date(p[0]), priceAUD: p[1] }));
+        });
+        S.history = out;
     }
 
     // /api/macro — fetch one or more instrument categories. Optionally
@@ -642,8 +688,16 @@
     }
 
     // ==================== CALCULATIONS ====================
+    // Convert any per-holding USD-native value (price, costBasis) to AUD using
+    // today's spot. AUD/USD from Yahoo `AUDUSD=X` is "USD per 1 AUD" — to convert
+    // a USD figure to AUD we DIVIDE by audusd.
+    function toAUD(usdValue) {
+        return (S.audusd > 0) ? usdValue / S.audusd : usdValue;
+    }
+
     function recalculate() {
-        let totalValue = 0, totalDayPnl = 0, totalUnrealizedPnl = 0;
+        let totalValue = 0, totalDayPnl = 0, totalCostBasisAUD = 0, totalUnrealizedPnl = 0;
+        let missingPriceTickers = [];
 
         S.holdings.forEach(h => {
             let price = S.prices[h.yf] || 0;
@@ -651,23 +705,32 @@
             const ext = S.extras[h.yf] || {};
             const tech = S.technicals[h.yf] || {};
 
-            if (h.currency === 'USD' && S.audusd > 0) price = price / S.audusd;
+            // FX: only convert the live price if the data source returned USD.
+            // Crypto symbols come from CoinGecko in AUD already; equities (AMZN)
+            // come from Finnhub in USD. Cost basis is ALWAYS stored in AUD per
+            // the trade log (AMZN was purchased in AUD at A$292.7125/share).
+            const isUsdPrice = (h.priceCurrency === 'USD');
+            if (isUsdPrice) price = toAUD(price);
+            const costBasisAUD = h.costBasis;
 
             const mktVal = h.shares * price;
             const dayPnl = price > 0 ? h.shares * price * (dayChg / 100) : 0;
-            const totalPnl = mktVal - h.costBasis;
-            const retPct = h.costBasis > 0 ? (totalPnl / h.costBasis) * 100 : 0;
+            const totalPnl = mktVal - costBasisAUD;
+            const retPct = costBasisAUD > 0 ? (totalPnl / costBasisAUD) * 100 : 0;
+
+            if (price === 0) missingPriceTickers.push(h.ticker);
 
             h.priceAUD = price; h.dayChangePct = dayChg; h.marketValueAUD = mktVal;
+            h.costBasisAUD = costBasisAUD;
             h.dayPnlAUD = dayPnl; h.totalPnlAUD = totalPnl; h.returnPct = retPct; h.weight = 0;
 
             let sma50 = tech.sma50 ?? ext.fiftyDayAvg ?? null;
             let high52 = ext.fiftyTwoWeekHigh ?? tech.fiftyTwoWeekHigh ?? null;
             let low52 = ext.fiftyTwoWeekLow ?? tech.fiftyTwoWeekLow ?? null;
-            if (h.currency === 'USD' && S.audusd > 0) {
-                if (sma50 != null) sma50 = sma50 / S.audusd;
-                if (high52 != null) high52 = high52 / S.audusd;
-                if (low52 != null) low52 = low52 / S.audusd;
+            if (isUsdPrice) {
+                if (sma50 != null) sma50 = toAUD(sma50);
+                if (high52 != null) high52 = toAUD(high52);
+                if (low52 != null) low52 = toAUD(low52);
             }
 
             h.sma50 = sma50;
@@ -677,7 +740,10 @@
             h.high52 = high52; h.low52 = low52;
             h.vs52wHigh = (high52 && high52 > 0) ? ((price - high52) / high52) * 100 : null;
 
-            totalValue += mktVal; totalDayPnl += dayPnl; totalUnrealizedPnl += totalPnl;
+            totalValue += mktVal;
+            totalDayPnl += dayPnl;
+            totalCostBasisAUD += costBasisAUD;
+            totalUnrealizedPnl += totalPnl;
         });
 
         S.holdings.forEach(h => { h.weight = totalValue > 0 ? (h.marketValueAUD / totalValue) * 100 : 0; });
@@ -685,14 +751,113 @@
         S.totalValue = totalValue;
         S.totalDayPnl = totalDayPnl;
         S.totalDayPnlPct = totalValue > 0 ? (totalDayPnl / totalValue) * 100 : 0;
+        S.totalCostBasis = totalCostBasisAUD;
         S.unrealizedPnl = totalUnrealizedPnl;
-        S.totalReturn = totalUnrealizedPnl + REALIZED_PNL - TOTAL_FEES;
-        S.totalReturnPct = TOTAL_COST_BASIS > 0 ? (S.totalReturn / TOTAL_COST_BASIS) * 100 : 0;
+        // Match Excel Portfolio Total exactly: unrealized P&L on open positions.
+        // REALIZED_PNL and TOTAL_FEES are informational cards only.
+        S.totalReturn = totalUnrealizedPnl;
+        S.totalReturnPct = totalCostBasisAUD > 0 ? (S.totalReturn / totalCostBasisAUD) * 100 : 0;
 
-        // RECONCILIATION: Cost Basis (open) + Unrealized P&L === Total Market Value
-        const openCostBasis = S.holdings.reduce((s, h) => s + h.costBasis, 0);
-        S.reconcileError = Math.abs((openCostBasis + totalUnrealizedPnl) - totalValue);
-        S.reconcileOk = S.reconcileError < 1;
+        // RECONCILIATION — real check, not a tautology.
+        // (1) Every holding must have a live price. Missing data = FAIL with the ticker.
+        // (2) Sum of weights must round to 100%.
+        // (3) Cost basis must be non-zero (catches a corrupted/empty holdings array).
+        const weightSum = S.holdings.reduce((s, h) => s + h.weight, 0);
+        const weightOk = Math.abs(weightSum - 100) < 0.01 || totalValue === 0;
+        const basisOk = totalCostBasisAUD > 0;
+        const dataOk = missingPriceTickers.length === 0;
+
+        if (!dataOk) {
+            S.reconcileOk = false;
+            S.reconcileError = missingPriceTickers.length;
+            S.reconcileMsg = `MISSING PRICES: ${missingPriceTickers.join(', ')}`;
+        } else if (!weightOk) {
+            S.reconcileOk = false;
+            S.reconcileError = Math.abs(weightSum - 100);
+            S.reconcileMsg = `WEIGHT SUM ${weightSum.toFixed(2)}% (expected 100%)`;
+        } else if (!basisOk) {
+            S.reconcileOk = false;
+            S.reconcileError = 0;
+            S.reconcileMsg = 'COST BASIS ZERO — holdings array empty?';
+        } else {
+            S.reconcileOk = true;
+            S.reconcileError = 0;
+            S.reconcileMsg = 'all positions priced · weights sum to 100%';
+        }
+
+        // Period returns require historical data — recompute if we have it
+        if (Object.keys(S.history).length > 0) {
+            S.periodReturns = computePeriodReturns();
+        }
+    }
+
+    // ==================== PERIOD RETURNS (synthetic basket) ====================
+    // For each anchor date, value = Σ(current_shares × historical_close_AUD).
+    // AMZN is excluded (no history source yet) — flagged in the UI footnote.
+    // Returns: { w1, m1, m3, ytd, y1, si } each = { pnl, pct } or null if no data.
+    function computePeriodReturns() {
+        const today = new Date();
+        const anchors = {
+            w1:  daysAgo(today, 7),
+            m1:  daysAgo(today, 30),
+            m3:  daysAgo(today, 90),
+            ytd: new Date(today.getFullYear(), 0, 1),
+            y1:  daysAgo(today, 365),
+        };
+
+        // Only AUD-priced holdings contribute. Equities (AMZN) are excluded
+        // because their history series is in USD and we don't have daily FX
+        // series to convert each historical bar — mixing USD closes into an
+        // AUD basket silently inflates returns. See footnote under the cards.
+        const tracked = S.holdings.filter(h =>
+            h.priceCurrency === 'AUD' &&
+            Array.isArray(S.history[h.yf]) &&
+            S.history[h.yf].length > 0
+        );
+
+        const valueAt = (date) => {
+            let v = 0;
+            tracked.forEach(h => {
+                const series = S.history[h.yf];
+                const close = nearestClose(series, date);
+                if (close != null) v += h.shares * close;
+            });
+            return v;
+        };
+
+        const valueNow = tracked.reduce((s, h) => s + h.marketValueAUD, 0);
+
+        const out = {};
+        Object.entries(anchors).forEach(([key, date]) => {
+            const vStart = valueAt(date);
+            if (vStart > 0) {
+                const pnl = valueNow - vStart;
+                out[key] = { pnl, pct: (pnl / vStart) * 100 };
+            } else {
+                out[key] = null;
+            }
+        });
+
+        // SI = since inception. This is just the existing Total Return (which
+        // already includes ALL holdings via cost basis), no history needed.
+        out.si = { pnl: S.totalReturn, pct: S.totalReturnPct };
+
+        // Track which holdings were excluded so the UI can footnote it
+        out._excluded = S.holdings.filter(h => !tracked.includes(h)).map(h => h.ticker);
+        return out;
+    }
+
+    function daysAgo(d, n) { const x = new Date(d); x.setDate(x.getDate() - n); return x; }
+
+    // Find the closing price on or just before `target`. Series is sorted ascending by date.
+    function nearestClose(series, target) {
+        const t = target.getTime();
+        let last = null;
+        for (const pt of series) {
+            if (pt.date.getTime() <= t) last = pt.priceAUD;
+            else break;
+        }
+        return last;
     }
 
     // ==================== RENDERING ====================
@@ -708,24 +873,30 @@
     }
 
     function renderPortfolioView() {
+        // Row 1 — headline cards
         document.getElementById('portfolioCards').innerHTML = `
             <div class="card"><div class="card-label">Total Value</div><div class="card-value">${fmtC(S.totalValue)}</div></div>
             <div class="card"><div class="card-label">Day P&L</div><div class="card-value ${clr(S.totalDayPnl)}">${fmtC(S.totalDayPnl)}</div><div class="card-change ${S.totalDayPnl>=0?'positive':'negative'}">${fmtP(S.totalDayPnlPct)}</div></div>
             <div class="card"><div class="card-label">Total Return</div><div class="card-value ${clr(S.totalReturn)}">${fmtC(S.totalReturn)}</div><div class="card-change ${S.totalReturn>=0?'positive':'negative'}">${fmtP(S.totalReturnPct)}</div></div>
-            <div class="card"><div class="card-label">Invested Capital</div><div class="card-value">A$ 26,333.92</div></div>
+            <div class="card"><div class="card-label">Invested Capital</div><div class="card-value">${fmtC(S.totalCostBasis)}</div></div>
             <div class="card"><div class="card-label">Realized P&L</div><div class="card-value ${clr(REALIZED_PNL)}">${fmtC(REALIZED_PNL)}</div></div>
             <div class="card"><div class="card-label">Cash Balance</div><div class="card-value">${fmtC(CASH_BALANCE)}</div></div>`;
+
+        // Row 2 — period returns (1W / 1M / 3M / YTD / 1Y / SI)
+        renderPeriodCards();
+
+        // (rest of original renderPortfolioView continues below — banner, table, donut)
 
         // Reconciliation
         const rb = document.getElementById('reconciliationBanner');
         const parts = `<div class="reconciliation-parts">
-            <div class="reconciliation-part"><div class="reconciliation-part-label">Cost Basis (Open)</div><div class="reconciliation-part-value">${fmtC(TOTAL_COST_BASIS)}</div></div>
+            <div class="reconciliation-part"><div class="reconciliation-part-label">Cost Basis (Open)</div><div class="reconciliation-part-value">${fmtC(S.totalCostBasis)}</div></div>
             <div class="reconciliation-part"><div class="reconciliation-part-label">+ Unrealized P&L</div><div class="reconciliation-part-value">${fmtC(S.unrealizedPnl)}</div></div>
             <div class="reconciliation-part"><div class="reconciliation-part-label">= Market Value</div><div class="reconciliation-part-value">${fmtC(S.totalValue)}</div></div>
             <div class="reconciliation-part"><div class="reconciliation-part-label">Realized P&L</div><div class="reconciliation-part-value">${fmtC(REALIZED_PNL)}</div></div>
             <div class="reconciliation-part"><div class="reconciliation-part-label">Fees</div><div class="reconciliation-part-value">${fmtC(TOTAL_FEES)}</div></div></div>`;
-        if (S.reconcileOk) { rb.innerHTML = `<span class="status-text">RECONCILIATION PASS</span>${parts}`; rb.className = 'reconciliation-banner pass'; }
-        else { rb.innerHTML = `<span class="status-text">RECONCILIATION FAIL (delta ${fmtC(S.reconcileError)})</span>${parts}`; rb.className = 'reconciliation-banner fail'; }
+        if (S.reconcileOk) { rb.innerHTML = `<span class="status-text">RECONCILIATION PASS</span><span style="font-size:9px;color:var(--text-muted)">${S.reconcileMsg}</span>${parts}`; rb.className = 'reconciliation-banner pass'; }
+        else { rb.innerHTML = `<span class="status-text">RECONCILIATION FAIL — ${S.reconcileMsg}</span>${parts}`; rb.className = 'reconciliation-banner fail'; }
 
         // Holdings table
         const sorted = [...S.holdings].sort((a, b) => b.marketValueAUD - a.marketValueAUD);
@@ -774,6 +945,44 @@
         classes.forEach((cls, i) => { const y = 285+i*16; svg += `<rect x="20" y="${y}" width="10" height="10" fill="${colors[i%colors.length]}"/><text x="35" y="${y+8}" font-size="10" fill="var(--text-primary)">${cls} (${((classMap[cls]/total)*100).toFixed(1)}%)</text>`; });
         svg += '</g>';
         document.getElementById('allocationChart').innerHTML = svg;
+    }
+
+    // Render the second card row (1W / 1M / 3M / YTD / 1Y / SI).
+    // Cards stay greyed-out until fetchHistory() has populated S.history.
+    function renderPeriodCards() {
+        const container = document.getElementById('periodCards');
+        const footnote  = document.getElementById('periodFootnote');
+        const periods = [
+            { key: 'w1',  label: '1W' },
+            { key: 'm1',  label: '1M' },
+            { key: 'm3',  label: '3M' },
+            { key: 'ytd', label: 'YTD' },
+            { key: 'y1',  label: '1Y' },
+            { key: 'si',  label: 'Since Inception' },
+        ];
+
+        if (!S.periodReturns) {
+            container.innerHTML = periods.map(p =>
+                `<div class="card"><div class="card-label">${p.label}</div><div class="card-value" style="color:var(--text-muted)">--</div><div class="card-change">load history</div></div>`
+            ).join('');
+            footnote.textContent = '';
+            return;
+        }
+
+        container.innerHTML = periods.map(p => {
+            const r = S.periodReturns[p.key];
+            if (!r) return `<div class="card"><div class="card-label">${p.label}</div><div class="card-value" style="color:var(--text-muted)">--</div><div class="card-change">no data</div></div>`;
+            return `<div class="card">
+                <div class="card-label">${p.label}</div>
+                <div class="card-value ${clr(r.pnl)}">${fmtC(r.pnl, 0)}</div>
+                <div class="card-change ${r.pnl>=0?'positive':'negative'}">${fmtP(r.pct)}</div>
+            </div>`;
+        }).join('');
+
+        const ex = S.periodReturns._excluded || [];
+        footnote.textContent = ex.length
+            ? `Period returns exclude ${ex.join(', ')} (no historical price source). SI uses cost basis and includes everything.`
+            : '';
     }
 
     function renderRiskView() {

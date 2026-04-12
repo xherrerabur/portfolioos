@@ -14,6 +14,8 @@
 
 const http  = require('http');
 const https = require('https');
+const fs    = require('fs');
+const path  = require('path');
 const PORT  = process.env.PORT || 3001;
 
 const CORS = {
@@ -215,6 +217,56 @@ async function handlePrices(body, res) {
   }
 }
 
+// /api/history — daily AUD closes via Yahoo v8 chart endpoint, used by the
+// dashboard's period-return cards (1W/1M/3M/YTD/1Y).
+function fetchYahooDaily(symbol, range = '1y') {
+  return new Promise((resolve) => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`;
+    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const r = JSON.parse(d)?.chart?.result?.[0];
+          const ts = r?.timestamp || [];
+          const closes = r?.indicators?.quote?.[0]?.close || [];
+          const points = [];
+          for (let i = 0; i < ts.length; i++) {
+            if (closes[i] != null) points.push([ts[i] * 1000, closes[i]]);
+          }
+          resolve(points);
+        } catch { resolve([]); }
+      });
+    }).on('error', () => resolve([]));
+  });
+}
+
+async function handleHistory(body, res) {
+  let payload;
+  try { payload = JSON.parse(body); } catch {
+    res.writeHead(400, CORS); return res.end(JSON.stringify({ error: 'Invalid JSON' }));
+  }
+  const symbols = payload?.symbols;
+  if (!Array.isArray(symbols) || !symbols.length) {
+    res.writeHead(400, CORS); return res.end(JSON.stringify({ error: '`symbols` array required' }));
+  }
+  console.log(`[${new Date().toISOString()}] /api/history — ${symbols.join(', ')}`);
+  try {
+    const series = {};
+    const skipped = [];
+    await Promise.all(symbols.map(async sym => {
+      const points = await fetchYahooDaily(sym, '1y');
+      if (points.length) series[sym] = points;
+      else skipped.push(sym);
+    }));
+    res.writeHead(200, CORS);
+    res.end(JSON.stringify({ series, skipped: skipped.length ? skipped : undefined }));
+  } catch (err) {
+    res.writeHead(500, CORS);
+    res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
 async function handleMacro(body, res) {
   let payload = {};
   try { payload = JSON.parse(body); } catch { /* body may be empty */ }
@@ -263,12 +315,26 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify({ status: 'ok', port: PORT, anthropic: !!process.env.ANTHROPIC_API_KEY }));
   }
 
+  // Serve index.html at the root so the dashboard can be opened in a real
+  // browser (file:// breaks fetch CORS in some setups). Same-origin solves it.
+  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'index.html'));
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end(html);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      return res.end('index.html not found: ' + e.message);
+    }
+  }
+
   if (req.method === 'POST') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
-      if (req.url === '/api/prices') return handlePrices(body, res);
-      if (req.url === '/api/macro')  return handleMacro(body, res);
+      if (req.url === '/api/prices')  return handlePrices(body, res);
+      if (req.url === '/api/history') return handleHistory(body, res);
+      if (req.url === '/api/macro')   return handleMacro(body, res);
       res.writeHead(404, CORS); res.end(JSON.stringify({ error: 'Not found' }));
     });
     return;
