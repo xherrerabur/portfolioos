@@ -267,6 +267,55 @@ async function handleHistory(body, res) {
   }
 }
 
+// /api/whatif — fetch live price + 1Y daily closes for a single symbol.
+// Used by the risk page "what-if" simulator. Returns everything the client
+// needs to compute correlation and blended backtests.
+async function handleWhatif(body, res) {
+  let payload;
+  try { payload = JSON.parse(body); } catch {
+    res.writeHead(400, CORS); return res.end(JSON.stringify({ error: 'Invalid JSON' }));
+  }
+  const symbol = payload?.symbol;
+  if (!symbol || typeof symbol !== 'string') {
+    res.writeHead(400, CORS); return res.end(JSON.stringify({ error: '`symbol` string required' }));
+  }
+  console.log(`[${new Date().toISOString()}] /api/whatif — ${symbol}`);
+  try {
+    // Fetch 1Y daily history via Yahoo v8 chart (includes current price)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`;
+    const data = await new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+        let d = '';
+        r.on('data', c => d += c);
+        r.on('end', () => { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } });
+      }).on('error', reject);
+    });
+    const result = data?.chart?.result?.[0];
+    if (!result) {
+      res.writeHead(404, CORS); return res.end(JSON.stringify({ error: `Symbol "${symbol}" not found` }));
+    }
+    const meta = result.meta || {};
+    const ts = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    const series = [];
+    for (let i = 0; i < ts.length; i++) {
+      if (closes[i] != null) series.push([ts[i] * 1000, closes[i]]);
+    }
+    res.writeHead(200, CORS);
+    res.end(JSON.stringify({
+      symbol,
+      name: meta.shortName || meta.longName || symbol,
+      currency: meta.currency || 'USD',
+      price: meta.regularMarketPrice ?? null,
+      prevClose: meta.chartPreviousClose ?? meta.previousClose ?? null,
+      series, // [[ms, close], ...]
+    }));
+  } catch (err) {
+    res.writeHead(500, CORS);
+    res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
 async function handleMacro(body, res) {
   let payload = {};
   try { payload = JSON.parse(body); } catch { /* body may be empty */ }
@@ -334,6 +383,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       if (req.url === '/api/prices')  return handlePrices(body, res);
       if (req.url === '/api/history') return handleHistory(body, res);
+      if (req.url === '/api/whatif')  return handleWhatif(body, res);
       if (req.url === '/api/macro')   return handleMacro(body, res);
       res.writeHead(404, CORS); res.end(JSON.stringify({ error: 'Not found' }));
     });
@@ -346,6 +396,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   const hasKey = !!process.env.ANTHROPIC_API_KEY;
   console.log(`\n  PortfolioOS Server  •  http://localhost:${PORT}`);
-  console.log(`  POST /api/prices   •  POST /api/macro  •  GET /health`);
+  console.log(`  POST /api/prices  •  POST /api/history  •  POST /api/whatif  •  POST /api/macro  •  GET /health`);
   console.log(`  Anthropic key: ${hasKey ? '✓ set via ANTHROPIC_API_KEY' : '✗ not set — export ANTHROPIC_API_KEY=sk-ant-... for AI macro'}\n`);
 });

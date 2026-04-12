@@ -303,22 +303,35 @@
                 <!-- ========== RISK VIEW ========== -->
                 <div class="view" data-view="risk" id="riskView">
                     <h1>RISK ANALYSIS</h1>
-                    <h2>CONCENTRATION METRICS</h2>
-                    <table><thead><tr><th>Metric</th><th class="num">Value</th><th>Severity</th><th>Interpretation</th></tr></thead><tbody id="riskBody"></tbody></table>
 
-                    <h2>CURRENT vs TARGET ALLOCATION (BUCKET)</h2>
-                    <table><thead><tr><th>Bucket</th><th class="num">Current %</th><th class="num">Target %</th><th class="num">Drift %</th><th class="num">A$ to Add/Trim</th><th>Action</th><th>Why</th></tr></thead><tbody id="allocationBucketBody"></tbody></table>
+                    <h2>CURRENT EXPOSURE</h2>
+                    <div class="cards-row" id="exposureCards"></div>
+                    <table><thead><tr><th>Ticker</th><th class="num">Weight %</th><th>Asset Class</th><th>Theme</th><th>FX</th><th class="num">P&L %</th></tr></thead><tbody id="exposureBody"></tbody></table>
 
-                    <h2>POSITION-LEVEL DRIFT</h2>
-                    <table><thead><tr><th>Ticker</th><th class="num">Current %</th><th class="num">Target %</th><th class="num">Drift %</th><th class="num">A$ to Add/Trim</th><th>Action</th></tr></thead><tbody id="positionDriftBody"></tbody></table>
+                    <div class="characterization-card" id="characterizationCard" style="margin:12px 0">
+                        <div class="characterization-body" id="characterization">Load prices to see exposure summary.</div>
+                    </div>
 
-                    <h2>PORTFOLIO CHARACTERIZATION</h2>
-                    <div class="characterization-card" id="characterizationCard">
-                        <div class="characterization-title">
-                            <span class="material-symbols-outlined" style="font-size:14px">warning</span>
-                            <span id="characterizationTitle">PORTFOLIO RISK PROFILE</span>
+                    <h2>WHAT IF I ADDED…</h2>
+                    <p style="font-size:10px;color:var(--text-muted);margin-bottom:8px">Enter any Yahoo Finance ticker to see how it would have changed your portfolio's risk and returns over the past year. Use the slider to set the allocation %.</p>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+                        <input id="whatifSymbol" type="text" placeholder="e.g. ITA, LMT, GLD, VAS" style="background:var(--card-bg);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-family:inherit;font-size:11px;width:180px;text-transform:uppercase">
+                        <button id="whatifBtn" style="white-space:nowrap">ANALYSE</button>
+                        <span id="whatifStatus" style="font-size:10px;color:var(--text-muted)"></span>
+                    </div>
+
+                    <div id="whatifResults" style="display:none">
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+                            <label style="font-size:10px;color:var(--text-secondary)">ALLOCATION:</label>
+                            <input id="whatifSlider" type="range" min="1" max="50" value="10" style="flex:1;min-width:120px;max-width:300px;accent-color:var(--green)">
+                            <span id="whatifSliderLabel" style="font-size:12px;font-weight:600;color:var(--text-primary);min-width:36px">10%</span>
                         </div>
-                        <div class="characterization-body" id="characterization">Load prices to see characterization.</div>
+                        <div class="cards-row" id="whatifCards"></div>
+                        <h3 style="margin:12px 0 6px">BACKTEST COMPARISON</h3>
+                        <table><thead><tr><th>Period</th><th class="num">Your Portfolio</th><th class="num">With <span id="whatifTickerLabel">—</span></th><th class="num">Difference</th></tr></thead><tbody id="whatifBacktestBody"></tbody></table>
+                        <h3 style="margin:12px 0 6px">CORRELATION</h3>
+                        <table><thead><tr><th>Your Holding</th><th class="num">Correlation</th><th>Interpretation</th></tr></thead><tbody id="whatifCorrelationBody"></tbody></table>
+                        <div id="whatifFootnote" style="font-size:9px;color:var(--text-muted);margin-top:6px"></div>
                     </div>
                 </div>
 
@@ -988,61 +1001,241 @@
     function renderRiskView() {
         const hs = S.holdings;
         const sorted = [...hs].sort((a, b) => b.weight - a.weight);
-        const largest = sorted[0];
-        const top3W = sorted.slice(0,3).reduce((s,h)=>s+h.weight,0);
         const cryptoW = hs.filter(h=>h.assetClass==='Crypto').reduce((s,h)=>s+h.weight,0);
         const equityW = hs.filter(h=>h.assetClass==='US Equities').reduce((s,h)=>s+h.weight,0);
-        const specW = hs.filter(h=>h.positionType==='speculative').reduce((s,h)=>s+h.weight,0);
-        const usdW = hs.filter(h=>h.currency==='USD').reduce((s,h)=>s+h.weight,0);
-        const themeMap = {}; hs.forEach(h => { themeMap[h.theme] = (themeMap[h.theme]||0)+h.weight; });
-        const bigTheme = Object.entries(themeMap).sort((a,b)=>b[1]-a[1])[0];
+        const usdW = hs.filter(h=>h.priceCurrency==='USD').reduce((s,h)=>s+h.weight,0);
+        const numClasses = new Set(hs.map(h=>h.assetClass)).size;
+        const numThemes = new Set(hs.map(h=>h.theme)).size;
 
-        const sev = (v,t) => v > t[0] ? 'Severe' : v > t[1] ? 'Elevated' : 'Manageable';
-        const risks = [
-            { m: 'Largest Position', v: `${largest.ticker}: ${fmtN(largest.weight,1)}%`, s: sev(largest.weight,[35,20]), i: `${largest.ticker} at ${fmtN(largest.weight,1)}%. >35% Severe, 20-35% Elevated.` },
-            { m: 'Top 3 Concentration', v: `${fmtN(top3W,1)}%`, s: sev(top3W,[75,60]), i: `Top 3 at ${fmtN(top3W,1)}%. >75% Severe.` },
-            { m: 'Asset Class (Crypto)', v: `${fmtN(cryptoW,1)}%`, s: sev(cryptoW,[60,45]), i: `Crypto at ${fmtN(cryptoW,1)}%. >60% = Severe single-class concentration.` },
-            { m: 'Speculative Sleeve', v: `${fmtN(specW,1)}%`, s: sev(specW,[15,8]), i: `Spec positions at ${fmtN(specW,1)}%. >15% Severe.` },
-            { m: 'FX Exposure (USD)', v: `${fmtN(usdW,1)}%`, s: usdW>40?'Elevated':'Manageable', i: `${fmtN(usdW,1)}% USD-denominated. AUD/USD swings affect valuation.` },
-            { m: 'Largest Theme', v: `${bigTheme[0]}: ${fmtN(bigTheme[1],1)}%`, s: bigTheme[1]>50?'Elevated':'Manageable', i: `Single-theme risk at ${fmtN(bigTheme[1],1)}%.` },
-            { m: 'Cash Allocation', v: '0.0%', s: 'Severe', i: 'Zero cash buffer. No dry powder for drawdowns or opportunities.' },
-        ];
-        document.getElementById('riskBody').innerHTML = risks.map(r => {
-            const sc = r.s==='Severe'?'badge-severe':r.s==='Elevated'?'badge-elevated':'badge-manageable';
-            return `<tr><td><strong>${r.m}</strong></td><td class="num">${r.v}</td><td><span class="badge ${sc}">${r.s}</span></td><td>${r.i}</td></tr>`;
-        }).join('');
+        // Exposure summary cards
+        document.getElementById('exposureCards').innerHTML = `
+            <div class="card"><div class="card-label">Positions</div><div class="card-value">${hs.length}</div></div>
+            <div class="card"><div class="card-label">Asset Classes</div><div class="card-value">${numClasses}</div></div>
+            <div class="card"><div class="card-label">Crypto</div><div class="card-value">${fmtN(cryptoW,1)}%</div></div>
+            <div class="card"><div class="card-label">Equities</div><div class="card-value">${fmtN(equityW,1)}%</div></div>
+            <div class="card"><div class="card-label">USD Exposed</div><div class="card-value">${fmtN(usdW,1)}%</div></div>
+            <div class="card"><div class="card-label">Themes</div><div class="card-value">${numThemes}</div></div>`;
 
-        // Bucket drift
-        let allocatedW = 0;
-        const bucketRows = [];
-        Object.entries(TARGET_ALLOCATION_BUCKETS).forEach(([name, cfg]) => {
-            const cw = cfg.holdings.length > 0 ? hs.filter(h => cfg.holdings.includes(h.ticker)).reduce((s,h) => s+h.weight, 0) : 0;
-            if (name !== 'Cash / Reserve') allocatedW += cw;
-            const tw = cfg.target * 100;
-            const drift = name === 'Cash / Reserve' ? (100 - allocatedW) - tw : cw - tw;
-            const dA = (drift/100)*S.totalValue;
-            const act = drift > 5 ? 'TRIM' : drift < -5 ? 'ADD' : 'HOLD';
-            const why = drift>5?`Overweight ${fmtN(Math.abs(drift),1)}% — trim ${fmtC(Math.abs(dA),0)}`:drift<-5?`Underweight ${fmtN(Math.abs(drift),1)}% — add ${fmtC(Math.abs(dA),0)}`:'Within tolerance';
-            bucketRows.push({ name, cw: name==='Cash / Reserve'?Math.max(0,100-allocatedW):cw, tw, drift, dA, act, why });
-        });
-        document.getElementById('allocationBucketBody').innerHTML = bucketRows.map(r =>
-            `<tr><td><strong>${r.name}</strong></td><td class="num">${fmtN(r.cw,1)}</td><td class="num">${fmtN(r.tw,1)}</td>
-            <td class="num ${r.drift>3?'text-negative':r.drift<-3?'text-positive':''}">${fmtP(r.drift,1)}</td>
-            <td class="num">${fmtC(r.dA,0)}</td><td><span class="badge badge-neutral">${r.act}</span></td><td style="font-size:9px">${r.why}</td></tr>`
+        // Per-holding exposure table
+        document.getElementById('exposureBody').innerHTML = sorted.map(h =>
+            `<tr><td><strong>${h.ticker}</strong></td><td class="num">${fmtN(h.weight,1)}</td>
+            <td>${h.assetClass}</td><td>${h.theme}</td><td>${h.priceCurrency}</td>
+            <td class="num ${clr(h.returnPct)}">${fmtP(h.returnPct)}</td></tr>`
         ).join('');
 
-        // Position drift
-        document.getElementById('positionDriftBody').innerHTML = sorted.map(h => {
-            const t = (POSITION_TARGETS[h.ticker]||0)*100, d = h.weight-t, dA = (d/100)*S.totalValue;
-            return `<tr><td><strong>${h.ticker}</strong></td><td class="num">${fmtN(h.weight,1)}</td><td class="num">${fmtN(t,1)}</td>
-                <td class="num ${d>3?'text-negative':d<-3?'text-positive':''}">${fmtP(d,1)}</td><td class="num">${fmtC(dA,0)}</td>
-                <td><span class="badge badge-neutral">${d>5?'TRIM':d<-5?'ADD':'HOLD'}</span></td></tr>`;
+        // Plain-English characterization
+        const topTicker = sorted[0]?.ticker || '?';
+        const top3W = sorted.slice(0,3).reduce((s,h)=>s+h.weight,0);
+        const themeMap = {}; hs.forEach(h => { themeMap[h.theme] = (themeMap[h.theme]||0)+h.weight; });
+        const bigTheme = Object.entries(themeMap).sort((a,b)=>b[1]-a[1])[0];
+        document.getElementById('characterization').textContent =
+            `${hs.length} positions across ${numClasses} asset class${numClasses>1?'es':''}. ` +
+            `${fmtN(cryptoW,0)}% crypto, ${fmtN(equityW,0)}% equities. ` +
+            `Top 3 (${sorted.slice(0,3).map(h=>h.ticker).join('/')}) = ${fmtN(top3W,0)}% of portfolio. ` +
+            `Largest theme: ${bigTheme[0]} at ${fmtN(bigTheme[1],0)}%. ` +
+            `${usdW > 0 ? fmtN(usdW,0)+'% exposed to USD/AUD moves.' : 'No FX exposure.'} ` +
+            `Crypto holdings are highly correlated — a broad crypto drawdown hits ${fmtN(cryptoW,0)}% of the book.`;
+    }
+
+    // ==================== WHAT-IF SIMULATOR ====================
+    // Stores the last loaded what-if data so the slider can recompute without re-fetching.
+    let whatifData = null; // { symbol, name, currency, price, series: [[ms,close],...] }
+
+    function setupWhatif() {
+        const btn = document.getElementById('whatifBtn');
+        const input = document.getElementById('whatifSymbol');
+        const slider = document.getElementById('whatifSlider');
+
+        btn.addEventListener('click', () => loadWhatif(input.value.trim().toUpperCase()));
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+        slider.addEventListener('input', () => {
+            document.getElementById('whatifSliderLabel').textContent = slider.value + '%';
+            if (whatifData) renderWhatifResults();
+        });
+    }
+
+    async function loadWhatif(symbol) {
+        if (!symbol) return;
+        const status = document.getElementById('whatifStatus');
+        status.textContent = `Loading ${symbol}…`;
+        document.getElementById('whatifResults').style.display = 'none';
+        try {
+            const resp = await fetch(`${API_BASE}/api/whatif`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol })
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                status.textContent = err.error || `Error ${resp.status}`;
+                return;
+            }
+            whatifData = await resp.json();
+            status.textContent = `${whatifData.name} (${whatifData.currency})`;
+            document.getElementById('whatifResults').style.display = '';
+            document.querySelectorAll('#whatifTickerLabel').forEach(el => el.textContent = whatifData.symbol);
+            renderWhatifResults();
+        } catch (e) {
+            status.textContent = 'Fetch failed: ' + e.message;
+        }
+    }
+
+    // Normalize any ms timestamp to YYYY-MM-DD string for cross-source alignment.
+    // Crypto history uses midnight UTC; Yahoo equities use market-open ~13:30 UTC.
+    function dateKey(ms) {
+        const d = new Date(ms);
+        return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+    }
+
+    function renderWhatifResults() {
+        if (!whatifData || !whatifData.series.length) return;
+        const allocPct = parseInt(document.getElementById('whatifSlider').value) / 100;
+        const wi = whatifData;
+
+        // Build daily return series for the what-if asset, keyed by YYYY-MM-DD
+        const wiReturns = {};
+        for (let i = 1; i < wi.series.length; i++) {
+            const [ms, close] = wi.series[i];
+            const prevClose = wi.series[i-1][1];
+            if (prevClose > 0) wiReturns[dateKey(ms)] = (close - prevClose) / prevClose;
+        }
+
+        // Build daily return series for current portfolio basket (AUD history)
+        const portfolioDailyValues = {};
+        const tracked = S.holdings.filter(h => h.priceCurrency === 'AUD' && Array.isArray(S.history[h.yf]) && S.history[h.yf].length);
+        if (tracked.length) {
+            const allDates = new Set();
+            tracked.forEach(h => S.history[h.yf].forEach(pt => allDates.add(dateKey(pt.date.getTime()))));
+            const sortedKeys = [...allDates].sort();
+
+            sortedKeys.forEach(dk => {
+                let v = 0;
+                // Use a date at noon UTC to avoid timezone edge cases in nearestClose
+                const probeDate = new Date(dk + 'T12:00:00Z');
+                tracked.forEach(h => {
+                    const series = S.history[h.yf];
+                    const close = nearestClose(series, probeDate);
+                    if (close != null) v += h.shares * close;
+                });
+                if (v > 0) portfolioDailyValues[dk] = v;
+            });
+        }
+        const portDateKeys = Object.keys(portfolioDailyValues).sort();
+        const portReturns = {};
+        for (let i = 1; i < portDateKeys.length; i++) {
+            const prev = portfolioDailyValues[portDateKeys[i-1]];
+            if (prev > 0) portReturns[portDateKeys[i]] = (portfolioDailyValues[portDateKeys[i]] - prev) / prev;
+        }
+
+        // Align — only date-keys present in BOTH return series
+        const commonDates = portDateKeys.filter(dk => wiReturns[dk] !== undefined && portReturns[dk] !== undefined);
+
+        // Cumulative returns for period backtest (dates are YYYY-MM-DD strings)
+        const cumulate = (dateKeys, retMap, blendW, wiRetMap) => {
+            let cum = 1;
+            dateKeys.forEach(dk => {
+                const portR = retMap[dk] || 0;
+                const wiR = wiRetMap ? (wiRetMap[dk] || 0) : 0;
+                const blended = wiRetMap ? (1 - blendW) * portR + blendW * wiR : portR;
+                cum *= (1 + blended);
+            });
+            return (cum - 1) * 100;
+        };
+
+        const today = new Date();
+        const cutoffDate = (daysBack) => {
+            const d = new Date(today); d.setDate(d.getDate() - daysBack);
+            return dateKey(d.getTime());
+        };
+        const periodDefs = [
+            { label: '1W',  cutoff: cutoffDate(7) },
+            { label: '1M',  cutoff: cutoffDate(30) },
+            { label: '3M',  cutoff: cutoffDate(90) },
+            { label: '6M',  cutoff: cutoffDate(182) },
+            { label: 'YTD', cutoff: today.getFullYear() + '-01-01' },
+            { label: '1Y',  cutoff: cutoffDate(365) },
+        ];
+
+        const backtestRows = periodDefs.map(p => {
+            const pDates = commonDates.filter(dk => dk >= p.cutoff);
+            if (pDates.length < 2) return { label: p.label, port: null, blend: null, diff: null };
+            const port = cumulate(pDates, portReturns, 0, null);
+            const blend = cumulate(pDates, portReturns, allocPct, wiReturns);
+            return { label: p.label, port, blend, diff: blend - port };
+        });
+
+        document.getElementById('whatifBacktestBody').innerHTML = backtestRows.map(r => {
+            if (r.port === null) return `<tr><td>${r.label}</td><td class="num" colspan="3" style="color:var(--text-muted)">insufficient data</td></tr>`;
+            return `<tr><td><strong>${r.label}</strong></td>
+                <td class="num ${clr(r.port)}">${fmtP(r.port)}</td>
+                <td class="num ${clr(r.blend)}">${fmtP(r.blend)}</td>
+                <td class="num ${clr(r.diff)}">${r.diff >= 0 ? '+' : ''}${fmtN(r.diff,2)}pp</td></tr>`;
         }).join('');
 
-        const notDiv = largest.weight > 25 || top3W > 60 || cryptoW > 60 || specW > 15;
-        document.getElementById('characterization').textContent = notDiv
-            ? `This is NOT a diversified portfolio. Concentrated crypto-dominated risk book: ${fmtN(cryptoW,0)}% crypto, ${fmtN(specW,0)}% speculative, zero cash. AMZN (${fmtN(equityW,0)}%) provides minimal diversification. Dominated by crypto beta — not intentional alpha-seeking given low-conviction speculative positions.`
-            : `Portfolio is reasonably diversified with managed concentration levels.`;
+        // Summary cards — use YTD or best available period
+        const ytdRow = backtestRows.find(r => r.label === 'YTD' && r.port !== null);
+        const y1Row = backtestRows.find(r => r.label === '1Y' && r.port !== null);
+        const bestRow = ytdRow || y1Row || backtestRows.find(r => r.port !== null);
+        const bestCutoff = bestRow === ytdRow ? today.getFullYear()+'-01-01' : bestRow === y1Row ? cutoffDate(365) : periodDefs.find(p => p.label === bestRow?.label)?.cutoff;
+        const wiYtdRet = bestRow && bestCutoff ? cumulate(commonDates.filter(dk => dk >= bestCutoff), {}, 1, wiReturns) : null;
+
+        document.getElementById('whatifCards').innerHTML = `
+            <div class="card"><div class="card-label">${wi.symbol} Price</div><div class="card-value">${wi.currency === 'USD' ? 'US$' : 'A$'} ${fmtN(wi.price,2)}</div></div>
+            <div class="card"><div class="card-label">Allocation</div><div class="card-value">${(allocPct*100).toFixed(0)}%</div><div class="card-change">${fmtC(S.totalValue * allocPct, 0)}</div></div>
+            <div class="card"><div class="card-label">${wi.symbol} ${bestRow?.label || ''} Return</div><div class="card-value ${wiYtdRet!=null?clr(wiYtdRet):''}">${wiYtdRet != null ? fmtP(wiYtdRet) : '--'}</div></div>
+            <div class="card"><div class="card-label">Blended ${bestRow?.label || ''} Impact</div><div class="card-value ${bestRow?clr(bestRow.diff):''}">${bestRow ? (bestRow.diff>=0?'+':'') + fmtN(bestRow.diff,2) + 'pp' : '--'}</div></div>`;
+
+        // Correlation: compute Pearson r between what-if daily returns and each holding's daily returns
+        const corrRows = [];
+        tracked.forEach(h => {
+            const hSeries = S.history[h.yf];
+            if (!hSeries || hSeries.length < 10) return;
+            // Build holding daily returns keyed by YYYY-MM-DD
+            const hReturns = {};
+            for (let i = 1; i < hSeries.length; i++) {
+                const dk = dateKey(hSeries[i].date.getTime());
+                const prev = hSeries[i-1].priceAUD;
+                if (prev > 0) hReturns[dk] = (hSeries[i].priceAUD - prev) / prev;
+            }
+            // Align on common date keys
+            const aligned = commonDates.filter(dk => hReturns[dk] !== undefined && wiReturns[dk] !== undefined);
+            if (aligned.length < 10) { corrRows.push({ ticker: h.ticker, r: null }); return; }
+            const xs = aligned.map(dk => hReturns[dk]);
+            const ys = aligned.map(dk => wiReturns[dk]);
+            const r = pearsonR(xs, ys);
+            corrRows.push({ ticker: h.ticker, r });
+        });
+        // AMZN — can't compute correlation without AUD history, note it
+        const amzn = S.holdings.find(h => h.priceCurrency === 'USD');
+        if (amzn) corrRows.push({ ticker: amzn.ticker, r: null, note: 'no AUD history' });
+
+        document.getElementById('whatifCorrelationBody').innerHTML = corrRows.map(c => {
+            if (c.r === null) return `<tr><td><strong>${c.ticker}</strong></td><td class="num" style="color:var(--text-muted)">—</td><td style="font-size:9px">${c.note || 'insufficient data'}</td></tr>`;
+            const abs = Math.abs(c.r);
+            const interp = abs < 0.2 ? 'Very low — good diversifier' : abs < 0.4 ? 'Low — some diversification' : abs < 0.6 ? 'Moderate' : abs < 0.8 ? 'High — moves together' : 'Very high — near-identical moves';
+            const col = abs < 0.3 ? 'text-positive' : abs > 0.7 ? 'text-negative' : '';
+            return `<tr><td><strong>${c.ticker}</strong></td><td class="num ${col}">${fmtN(c.r, 3)}</td><td style="font-size:9px">${interp}</td></tr>`;
+        }).join('');
+
+        // Footnote
+        document.getElementById('whatifFootnote').textContent =
+            `Backtest uses daily returns over overlapping dates (${commonDates.length} trading days). ` +
+            `"With ${wi.symbol}" simulates trimming each existing position proportionally to fund a ${(allocPct*100).toFixed(0)}% allocation. ` +
+            `Past performance ≠ future results. ${wi.currency !== 'AUD' ? wi.symbol + ' prices are in ' + wi.currency + ' — no FX conversion applied to historical bars.' : ''}`;
+    }
+
+    // Pearson correlation coefficient
+    function pearsonR(xs, ys) {
+        const n = xs.length;
+        if (n < 2) return 0;
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
+        for (let i = 0; i < n; i++) {
+            sx += xs[i]; sy += ys[i];
+            sxy += xs[i] * ys[i];
+            sx2 += xs[i] * xs[i]; sy2 += ys[i] * ys[i];
+        }
+        const denom = Math.sqrt((n*sx2 - sx*sx) * (n*sy2 - sy*sy));
+        return denom > 0 ? (n*sxy - sx*sy) / denom : 0;
     }
 
     function renderAttributionView() {
@@ -1546,6 +1739,9 @@
     // Manual-refresh only. No auto-fetch on page load — user asked for
     // click-to-refresh to avoid hammering the free-tier APIs.
     document.getElementById('refreshBtn').addEventListener('click', fetchPrices);
+
+    // What-if simulator (risk page)
+    setupWhatif();
 
     // LOAD MACRO button loads the Tier 1 core 20 instruments (no briefing)
     document.getElementById('loadMacroBtn').addEventListener('click', () => fetchMacro(['tier1'], false));
